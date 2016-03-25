@@ -1,10 +1,11 @@
 #include "allocator.h"
 
 #include <cstdlib>
+#include <exception>
 #include <fcntl.h>
 #include <iostream>
+#include <string>
 #include <unistd.h>
-
 
 namespace DB {
   Allocator::Allocator(const char * fname,
@@ -18,16 +19,14 @@ namespace DB {
     // Open the file, and test for success.
     mFD = open(fname, O_RDWR | O_CREAT | O_EXCL, 0666);
     if (mFD < 0) {
-      std::cerr << "Could not create database file: "
-                << fname << "!\n";
-      exit(EXIT_FAILURE);
+      std::string err("Could not create database file: ");
+      err += fname; err += "!";
+      throw std::runtime_error(err);
     }
 
     // Set the length of the database file.
-    if (ftruncate(mFD, psize * pcount) < 0) {
-      std::cerr << "Could not reserve space in database file.\n";
-      exit(EXIT_FAILURE);
-    }
+    if (ftruncate(mFD, psize * pcount) < 0)
+      throw std::runtime_error("Could not resize database file.\n");
   }
 
   Allocator::~Allocator()
