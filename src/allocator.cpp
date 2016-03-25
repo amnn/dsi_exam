@@ -56,7 +56,7 @@ namespace DB {
     }
 
     // set the pages in the run as allocated
-    for (unsigned i = pid0; i < pid0 + runLen; ++i)
+    for (page_id i = pid0; i < pid0 + runLen; ++i)
       mSpaceMap[i] = true;
 
     // return the first page id.
@@ -64,12 +64,13 @@ namespace DB {
   }
 
   void
-  Allocator::pfree(page_id pid)
+  Allocator::pfree(page_id pid0, int num)
   {
-    if (pid < 0 || pid >= mSpaceMap.size())
+    if (num < 0 || pid0 + num > mSpaceMap.size())
       std::runtime_error("Bad page id!");
 
-    mSpaceMap[pid] = false;
+    for (page_id i = pid0; i < pid0 + num; ++i)
+      mSpaceMap[i] = false;
   }
 
   void

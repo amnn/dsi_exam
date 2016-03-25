@@ -12,17 +12,20 @@ main(int, char **)
     const unsigned PAGE_SIZE = 1 << 10;
     DB::Allocator a("inc.db", PAGE_SIZE, 10);
 
-    DB::page_id pid = a.palloc(1);
+    DB::page_id pid = a.palloc(3);
+    cout << a.spaceMap() << endl;
 
-    char *buf = new char[PAGE_SIZE];
-    *(int *)buf = 42;
+    a.pfree(pid);
+    cout << a.spaceMap() << endl;
 
-    a.write(pid, buf);
+    pid = a.palloc(4);
+    cout << a.spaceMap() << endl;
 
-    *(int *)buf = 0;
-    a.read(pid, buf);
+    a.pfree(pid, 2);
+    cout << a.spaceMap() << endl;
 
-    cout << *(int *)buf << endl;
+    a.palloc(1); a.palloc(1);
+    cout << a.spaceMap() << endl;
 
   } catch(exception &e) {
     cerr << "IncDB terminated due to exception: "

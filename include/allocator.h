@@ -53,12 +53,14 @@ namespace DB {
     /**
      * Allocator::pfree
      *
-     * Free the page, so that future allocations may use it. No check is made to
-     * ensure the page is not already free.
+     * Free a run of pages, so that future allocations may use them. No check is
+     * made to ensure they are not already free.
      *
      * @param pid The page ID of the page to free.
+     * @param num The number of consecutive pages after this one to
+     *            free. (Defaults to 1)
      */
-    void pfree(page_id pid);
+    void pfree(page_id pid, int num = 1);
 
     /**
      * Allocator::read
