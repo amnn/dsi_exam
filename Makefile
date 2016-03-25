@@ -18,6 +18,6 @@ $(EXE): $(OBJ)
 obj/%.o: src/%.cpp
 	$(CMD) $(CCFLAGS) -c $< -o $@
 
-obj/incdb.o: include/allocator.h include/bufmgr.h
+obj/incdb.o: include/allocator.h include/bufmgr.h include/dim.h
 obj/allocator.o: include/allocator.h
 obj/bufmgr.o: include/allocator.h include/bufmgr.h include/frame.h include/replacer.h

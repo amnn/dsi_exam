@@ -2,6 +2,7 @@
 
 #include "allocator.h"
 #include "bufmgr.h"
+#include "dim.h"
 
 using namespace std;
 
@@ -9,8 +10,7 @@ int
 main(int, char **)
 {
   try {
-    const unsigned PAGE_SIZE = 1 << 10;
-    DB::Allocator a("inc.db", PAGE_SIZE, 10);
+    DB::Allocator a(DB::Dim::NAME, DB::Dim::PAGE_SIZE, DB::Dim::NUM_PAGES);
 
     DB::page_id pid = a.palloc(3);
     cout << a.spaceMap() << endl;
