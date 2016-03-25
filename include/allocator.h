@@ -10,7 +10,7 @@ namespace DB {
    * Type alias for page IDs
    */
   using page_id = unsigned;
-  static const page_id INVALID_PAGE = -1;
+  static constexpr page_id INVALID_PAGE = -1;
 
   /**
    * Allocator

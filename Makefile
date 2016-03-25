@@ -15,9 +15,5 @@ all: bin/incdb
 $(EXE): $(OBJ)
 	$(CMD) $(LDFLAGS) $(OBJ) -o $(EXE)
 
-obj/%.o: src/%.cpp
+obj/%.o: src/%.cpp $(INC)
 	$(CMD) $(CCFLAGS) -c $< -o $@
-
-obj/incdb.o: include/allocator.h include/bufmgr.h include/dim.h
-obj/allocator.o: include/allocator.h
-obj/bufmgr.o: include/allocator.h include/bufmgr.h include/frame.h include/replacer.h

@@ -1,8 +1,7 @@
 #include <iostream>
 
 #include "allocator.h"
-#include "bufmgr.h"
-#include "dim.h"
+#include "db.h"
 
 using namespace std;
 
@@ -10,22 +9,26 @@ int
 main(int, char **)
 {
   try {
-    DB::Allocator a(DB::Dim::NAME, DB::Dim::PAGE_SIZE, DB::Dim::NUM_PAGES);
+    DB::Global::setup();
 
-    DB::page_id pid = a.palloc(3);
-    cout << a.spaceMap() << endl;
+    DB::Allocator *a = DB::Global::ALLOC;
 
-    a.pfree(pid);
-    cout << a.spaceMap() << endl;
+    DB::page_id pid = a->palloc(3);
+    cout << a->spaceMap() << endl;
 
-    pid = a.palloc(4);
-    cout << a.spaceMap() << endl;
+    a->pfree(pid);
+    cout << a->spaceMap() << endl;
 
-    a.pfree(pid, 2);
-    cout << a.spaceMap() << endl;
+    pid = a->palloc(4);
+    cout << a->spaceMap() << endl;
 
-    a.palloc(1); a.palloc(1);
-    cout << a.spaceMap() << endl;
+    a->pfree(pid, 2);
+    cout << a->spaceMap() << endl;
+
+    a->palloc(1); a->palloc(1);
+    cout << a->spaceMap() << endl;
+
+    DB::Global::tearDown();
 
   } catch(exception &e) {
     cerr << "IncDB terminated due to exception: "
