@@ -1,4 +1,4 @@
-#include <cstddef>
+#include <string>
 #include <vector>
 
 namespace DB {
@@ -22,7 +22,7 @@ namespace DB {
      * @param psize    Size of a page, in bytes
      * @param pcount   Number of pages to reserve in file.
      */
-    Allocator(const char *fname, size_t psize, int pcount);
+    Allocator(const char *fname, unsigned psize, unsigned pcount);
 
     /**
      * Allocator::~Allocator
@@ -81,11 +81,17 @@ namespace DB {
     void write(page_id pid, char *buf);
 
   private:
-    static Allocator *sInstance;
-
+    // File descriptor for database file managed by this allocator.
     int mFD;
-    int mNumPages, mPageSize;
+
+    // Page Dimensions.
+    unsigned mPageSize, mNumPages;
+
+    // Map of free and occupied pages.
     std::vector<bool> mSpaceMap;
+
+    // Name of database file.
+    std::string mName;
   };
 
 }

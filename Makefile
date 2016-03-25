@@ -17,3 +17,5 @@ $(EXE): $(OBJ)
 
 obj/%.o: src/%.cpp
 	$(CMD) $(CCFLAGS) -c $< -o $@
+
+obj/incdb.o: include/allocator.h
