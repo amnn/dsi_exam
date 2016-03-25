@@ -4,6 +4,7 @@
 #include <exception>
 #include <fcntl.h>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <unistd.h>
 
@@ -12,8 +13,7 @@ namespace DB {
                        unsigned     psize,
                        unsigned     pcount)
     : mPageSize ( psize )
-    , mNumPages ( pcount )
-    , mSpaceMap ( psize * pcount, false )
+    , mSpaceMap ( pcount, false )
     , mName     ( fname )
   {
     // Open the file, and test for success.
@@ -26,7 +26,7 @@ namespace DB {
 
     // Set the length of the database file.
     if (ftruncate(mFD, psize * pcount) < 0)
-      throw std::runtime_error("Could not resize database file.\n");
+      throw std::runtime_error("Could not resize database file.");
   }
 
   Allocator::~Allocator()
@@ -37,9 +37,39 @@ namespace DB {
   }
 
   page_id
-  Allocator::palloc(int num)
+  Allocator::palloc(unsigned num)
   {
-    return 0;
+    // find a large enough run of free pages in the space map.
+    unsigned pid0 = 0, runLen = 0;
+    for (unsigned i = 0; i < mSpaceMap.size() && runLen < num; ++i)
+      if (mSpaceMap[i]) {
+        runLen = 0;
+      } else {
+        if (runLen == 0) pid0 = i;
+        runLen++;
+      }
+
+    if (runLen < num) {
+      std::stringstream err;
+      err << "Cannot allocate " << num << " contiguous pages!";
+      throw std::runtime_error(err.str());
+    }
+
+    // set the pages in the run as allocated
+    for (unsigned i = pid0; i < pid0 + runLen; ++i)
+      mSpaceMap[i] = true;
+
+    // return the first page id.
+    return pid0;
+  }
+
+  void
+  Allocator::pfree(page_id pid)
+  {
+    if(pid < 0 || pid >= mSpaceMap.size())
+      std::runtime_error("Bad page id!");
+
+    mSpaceMap[pid] = false;
   }
 
   void

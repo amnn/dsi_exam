@@ -6,7 +6,7 @@ namespace DB {
    * page_id
    * Type alias for page IDs
    */
-  using page_id = int;
+  using page_id = unsigned;
 
   /**
    * Allocator
@@ -44,7 +44,7 @@ namespace DB {
      * @param  num The number of pages to allocate
      * @return The page ID of the first page in the run.
      */
-    page_id palloc(int num);
+    page_id palloc(unsigned num);
 
     /**
      * Allocator::pfree
@@ -81,17 +81,10 @@ namespace DB {
     void write(page_id pid, char *buf);
 
   private:
-    // File descriptor for database file managed by this allocator.
-    int mFD;
-
-    // Page Dimensions.
-    unsigned mPageSize, mNumPages;
-
-    // Map of free and occupied pages.
-    std::vector<bool> mSpaceMap;
-
-    // Name of database file.
-    std::string mName;
+    int mFD;                        // File descriptor for database file managed by this allocator.
+    unsigned mPageSize;             // Number of bytes in a page.
+    std::vector<bool> mSpaceMap;    // Map of free and occupied pages.
+    std::string mName;              // Name of database file.
   };
 
 }
