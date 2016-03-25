@@ -66,19 +66,57 @@ namespace DB {
   void
   Allocator::pfree(page_id pid)
   {
-    if(pid < 0 || pid >= mSpaceMap.size())
+    if (pid < 0 || pid >= mSpaceMap.size())
       std::runtime_error("Bad page id!");
 
     mSpaceMap[pid] = false;
   }
 
   void
-  read(page_id pid, char *buf)
+  Allocator::read(page_id pid, char *buf)
   {
+    if (pid < 0 || pid >= mSpaceMap.size())
+      std::runtime_error("Bad page id!");
+
+    if (lseek(mFD, pid * mPageSize, SEEK_SET) < 0) {
+      std::stringstream err;
+      err << "Unable to seek to page " << pid << "!";
+      throw std::runtime_error(err.str());
+    }
+
+    if (::read(mFD, buf, mPageSize) != mPageSize) {
+      std::stringstream err;
+      err << "Could not read all of page " << pid << "!";
+      throw std::runtime_error(err.str());
+    }
   }
 
   void
-  write(page_id pid, char *buf)
+  Allocator::write(page_id pid, char *buf)
   {
+    if (pid < 0 || pid >= mSpaceMap.size())
+      std::runtime_error("Bad page id!");
+
+    if (lseek(mFD, pid * mPageSize, SEEK_SET) < 0) {
+      std::stringstream err;
+      err << "Unable to seek to page " << pid << "!";
+      throw std::runtime_error(err.str());
+    }
+
+    if (::write(mFD, buf, mPageSize) != mPageSize) {
+      std::stringstream err;
+      err << "Could not write all of page " << pid << "!";
+      throw std::runtime_error(err.str());
+    }
+  }
+
+  std::string
+  Allocator::spaceMap() const
+  {
+    std::stringstream map;
+    for (bool allocated : mSpaceMap)
+      map << (allocated ? '1' : '0');
+
+    return map.str();
   }
 }

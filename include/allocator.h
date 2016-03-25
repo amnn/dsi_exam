@@ -80,6 +80,15 @@ namespace DB {
      */
     void write(page_id pid, char *buf);
 
+    /**
+     * Allocator::spaceMap
+     *
+     * A representation of the space map as a string of 1's and 0's. 1
+     * representing an allocated page, and 0 a free page.
+     *
+     * @return a string representation of the space map.
+     */
+    std::string spaceMap() const;
   private:
     int mFD;                        // File descriptor for database file managed by this allocator.
     unsigned mPageSize;             // Number of bytes in a page.
