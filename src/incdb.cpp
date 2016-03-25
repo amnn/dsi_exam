@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "allocator.h"
+#include "bufmgr.h"
 
 using namespace std;
 

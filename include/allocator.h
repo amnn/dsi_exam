@@ -1,3 +1,6 @@
+#ifndef DB_ALLOCATOR_H
+#define DB_ALLOCATOR_H
+
 #include <string>
 #include <vector>
 
@@ -7,6 +10,7 @@ namespace DB {
    * Type alias for page IDs
    */
   using page_id = unsigned;
+  static const page_id INVALID_PAGE = -1;
 
   /**
    * Allocator
@@ -97,3 +101,5 @@ namespace DB {
   };
 
 }
+
+#endif // DB_ALLOCATOR_H
