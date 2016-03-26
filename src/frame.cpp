@@ -13,11 +13,7 @@ namespace DB {
     , mDirty(false)
   {}
 
-  Frame::~Frame()
-  {
-    evict();
-  }
-
+  Frame::~Frame()              { evict(); }
 
   void Frame::pin()            { mPinCount++; }
   void Frame::unpin()          { mPinCount--; }

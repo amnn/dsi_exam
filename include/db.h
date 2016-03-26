@@ -13,9 +13,6 @@ namespace DB {
   namespace Global {
     extern Allocator *ALLOC;
     extern BufMgr *BUFMGR;
-
-    void setup();
-    void tearDown();
   }
 }
 
