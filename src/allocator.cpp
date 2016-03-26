@@ -1,10 +1,10 @@
 #include "allocator.h"
 
 #include <cstdlib>
-#include <exception>
 #include <fcntl.h>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unistd.h>
 
@@ -49,11 +49,8 @@ namespace DB {
         runLen++;
       }
 
-    if (runLen < num) {
-      std::stringstream err;
-      err << "Cannot allocate " << num << " contiguous pages!";
-      throw std::runtime_error(err.str());
-    }
+    if (runLen < num)
+      return INVALID_PAGE;
 
     // set the pages in the run as allocated
     for (page_id i = pid0; i < pid0 + runLen; ++i)
@@ -66,6 +63,8 @@ namespace DB {
   void
   Allocator::pfree(page_id pid0, int num)
   {
+    if (pid0 == INVALID_PAGE) return;
+
     if (num < 0 || pid0 + num > mSpaceMap.size())
       std::runtime_error("Bad page id!");
 
@@ -76,7 +75,7 @@ namespace DB {
   void
   Allocator::read(page_id pid, char *buf)
   {
-    if (pid < 0 || pid >= mSpaceMap.size())
+    if (pid == INVALID_PAGE || pid >= mSpaceMap.size())
       std::runtime_error("Bad page id!");
 
     if (lseek(mFD, pid * mPageSize, SEEK_SET) < 0) {
@@ -95,7 +94,7 @@ namespace DB {
   void
   Allocator::write(page_id pid, char *buf)
   {
-    if (pid < 0 || pid >= mSpaceMap.size())
+    if (pid == INVALID_PAGE || pid >= mSpaceMap.size())
       std::runtime_error("Bad page id!");
 
     if (lseek(mFD, pid * mPageSize, SEEK_SET) < 0) {

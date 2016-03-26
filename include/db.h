@@ -2,6 +2,7 @@
 #define DB_DB_H
 
 #include "allocator.h"
+#include "bufmgr.h"
 #include "dim.h"
 
 namespace DB {
@@ -11,6 +12,7 @@ namespace DB {
    */
   namespace Global {
     extern Allocator *ALLOC;
+    extern BufMgr *BUFMGR;
 
     void setup();
     void tearDown();

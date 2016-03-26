@@ -5,7 +5,7 @@
 #include "dim.h"
 
 namespace DB {
-  static constexpr unsigned INVALID_FRAME = -1;
+  static constexpr int INVALID_FRAME = -1;
 
   /**
    * Frame

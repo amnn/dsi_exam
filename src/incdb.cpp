@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "allocator.h"
+#include "bufmgr.h"
 #include "db.h"
 
 using namespace std;
@@ -12,20 +13,26 @@ main(int, char **)
     DB::Global::setup();
 
     DB::Allocator *a = DB::Global::ALLOC;
+    DB::BufMgr    *b = DB::Global::BUFMGR;
 
-    DB::page_id pid = a->palloc(3);
+    char *page;
+
+    DB::page_id pid = b->bnew(page, 3);
     cout << a->spaceMap() << endl;
 
-    a->pfree(pid);
+    b->bfree(pid + 1);
     cout << a->spaceMap() << endl;
 
-    pid = a->palloc(4);
+    b->unpin(pid);
+    pid = b->bnew(page, 4);
     cout << a->spaceMap() << endl;
 
+    b->unpin(pid);
+    b->flush(pid);
     a->pfree(pid, 2);
     cout << a->spaceMap() << endl;
 
-    a->palloc(1); a->palloc(1);
+    b->bnew(page); b->bnew(page);
     cout << a->spaceMap() << endl;
 
     DB::Global::tearDown();
