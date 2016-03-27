@@ -41,7 +41,7 @@ namespace DB {
      * @return If the page is successfully pinned, a pointer to its data is
      *         returned, and if not, nullptr is returned.
      */
-    char *pin(page_id pid, bool isEmpty);
+    char *pin(page_id pid, bool isEmpty = false);
 
     /**
      * BufMgr::unpin
