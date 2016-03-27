@@ -19,16 +19,23 @@ main(int, char **)
     DB::Global::ALLOC  = &a;
     DB::Global::BUFMGR = &b;
 
-    cout << a.spaceMap() << endl;
-
     DB::Table t1(0, 1);
 
-    for(int i = 0; i < 100000; ++i) {
-      // cout << "Inserting " << i + 1 << endl;
-      t1.insert(i/100, i);
+    cout << "Inserting...";
+    for(int i = 0; i < 32; ++i) {
+      if (!t1.insert(i + 1, 1))
+        cout << "Hmm, this should be true" << endl;
     }
+    cout << "Done." << endl;
 
-    cout << a.spaceMap() << endl;
+    cout << "Re-inserting...";
+    for(int i = 0; i < 32; ++i) {
+      if (t1.insert(i + 1, 1)) {
+        cout << "Hmm, I've already inserted " << i + 1 << endl;
+      }
+    }
+    cout << "Done." << endl;
+
   } catch(exception &e) {
     cerr << "IncDB terminated due to exception: "
          << e.what() << endl;
