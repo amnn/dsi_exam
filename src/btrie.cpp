@@ -163,7 +163,7 @@ namespace DB {
     switch (type) {
     case Leaf:
       // Move half the records.
-      memmove(&node->l.data, &l.data[l.stride * pivot],
+      memmove(node->slot(0), slot(pivot),
               (count - pivot) * l.stride * sizeof(int));
 
       node->count    = count - pivot;
@@ -180,7 +180,7 @@ namespace DB {
       break;
     case Branch:
       // Move half the children, excluding the pivot key, which we push up.
-      memmove(&node->b.data, &b.data[BRANCH_STRIDE * (pivot + 1)],
+      memmove(node->slot(0), slot(pivot) + 1,
               ((count - pivot) * BRANCH_STRIDE - 1) * sizeof(int));
 
       node->count = count - pivot - 1;
@@ -197,18 +197,13 @@ namespace DB {
   void
   BTrie::makeRoom(int index)
   {
-    switch (type) {
-    case Leaf:
-      memmove(&l.data[(index + 1) * l.stride],
-              &l.data[index * l.stride],
-              (count - index) * l.stride * sizeof(int));
-      break;
-    case Branch:
-      memmove(&b.data[1 + BRANCH_STRIDE * (index + 1)],
-              &b.data[1 + BRANCH_STRIDE * index],
-              (count - index) * BRANCH_STRIDE * sizeof(int));
-      break;
-    }
+    int stride = type == Leaf
+      ? l.stride
+      : BRANCH_STRIDE;
+
+    memmove(slot(index + 1), slot(index),
+            (count - index) * stride * sizeof(int));
+
     count++;
   }
 
