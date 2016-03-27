@@ -151,6 +151,7 @@ namespace DB {
     enum { Branch, Leaf } type;
 
     int count;
+    page_id prev, next;
 
     union {
       struct {
@@ -158,7 +159,6 @@ namespace DB {
       } b;
 
       struct {
-        page_id prev, next;
         int stride;
         int data[1];
       } l;

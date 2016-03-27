@@ -18,9 +18,9 @@ namespace DB {
 
     leaf->type     = Leaf;
     leaf->count    = 0;
+    leaf->prev     = INVALID_PAGE;
+    leaf->next     = INVALID_PAGE;
     leaf->l.stride = stride;
-    leaf->l.prev   = INVALID_PAGE;
-    leaf->l.next   = INVALID_PAGE;
 
     Global::BUFMGR->unpin(lid, true);
 
@@ -34,8 +34,10 @@ namespace DB {
     page_id bid = Global::BUFMGR->bnew(page);
     BTrie *branch = (BTrie *)page;
 
-    branch->type = Branch;
+    branch->type  = Branch;
     branch->count = 1;
+    branch->prev  = INVALID_PAGE;
+    branch->next  = INVALID_PAGE;
 
     branch->slot(0)[-1] = left;
     branch->slot(0)[ 0] = key;
@@ -170,25 +172,24 @@ namespace DB {
       count          = pivot;
       node->l.stride = l.stride;
 
-      // Fix the neighbour pointers.
-      node->l.prev   = pid;
-      node->l.next   = l.next;
-      l.next         = nid;
-
-      key = l.data[l.stride * (pivot - 1)];
-
+      key = slot(pivot - 1)[0];
       break;
     case Branch:
       // Move half the children, excluding the pivot key, which we push up.
-      memmove(node->slot(0), slot(pivot) + 1,
+      memmove(node->slot(0) - 1, slot(pivot + 1) - 1,
               ((count - pivot) * BRANCH_STRIDE - 1) * sizeof(int));
 
       node->count = count - pivot - 1;
       count       = pivot;
 
-      key = b.data[1 + BRANCH_STRIDE * pivot];
+      key = slot(pivot)[0];
       break;
     }
+
+    // Fix the neighbour pointers.
+    node->prev = pid;
+    node->next = next;
+    next       = nid;
 
     Global::BUFMGR->unpin(nid, true);
     return {.key = key, .pid = nid};
