@@ -1,4 +1,7 @@
+#include <cstddef>
+
 #include "allocator.h"
+#include "dim.h"
 #include "trie_iterator.h"
 
 namespace DB {
@@ -34,7 +37,7 @@ namespace DB {
     bool insert(int x, int y);
 
     /**
-     * Table::insert
+     * Table::remove
      *
      * Remove a record from the table.
      *
@@ -42,7 +45,7 @@ namespace DB {
      * @param y The value of the record's second column.
      * @return True iff the deletion changed the table.
      */
-    bool delete(int x, int y);
+    bool remove(int x, int y);
 
     /**
      * Table::scan
@@ -54,8 +57,10 @@ namespace DB {
     TrieIterator scan();
 
   private:
+
     page_id mRootPID;
-    int     mOrder1;
-    int     mOrder2;
+    int     mRootOrder;
+    int     mSubOrder;
+    bool    mIsReversed;
   };
 }
