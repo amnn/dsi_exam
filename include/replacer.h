@@ -12,6 +12,7 @@ namespace DB {
    */
   struct Replacer {
     Replacer(Frame *frames, int poolSize);
+    ~Replacer();
 
     void framePinned(int fid);
     void frameUnpinned(int fid);

@@ -6,7 +6,7 @@ namespace DB {
   Replacer::Replacer(Frame *frames, int poolSize)
     : mFrames(frames)
     , mPoolSize(poolSize)
-    , mAllNodes(new Node[poolSize])
+    , mAllNodes(new Node[poolSize]())
     , mFree()
   {
     mFree.fid   = INVALID_FRAME;
@@ -16,6 +16,8 @@ namespace DB {
     for (int i = 0; i < poolSize; ++i)
       mAllNodes[i].fid = i;
   }
+
+  Replacer::~Replacer() { delete[] mAllNodes; }
 
   void
   Replacer::framePinned(int fid)
