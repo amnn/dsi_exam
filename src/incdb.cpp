@@ -3,7 +3,7 @@
 #include "allocator.h"
 #include "bufmgr.h"
 #include "db.h"
-
+#include "table.h"
 using namespace std;
 
 int
@@ -19,24 +19,15 @@ main(int, char **)
     DB::Global::ALLOC  = &a;
     DB::Global::BUFMGR = &b;
 
-    char *page;
-
-    DB::page_id pid = b.bnew(page, 3);
     cout << a.spaceMap() << endl;
 
-    b.bfree(pid + 1);
-    cout << a.spaceMap() << endl;
+    DB::Table t1(0, 1);
 
-    b.unpin(pid);
-    pid = b.bnew(page, 4);
-    cout << a.spaceMap() << endl;
+    for(int i = 0; i < 100000; ++i) {
+      // cout << "Inserting " << i + 1 << endl;
+      t1.insert(i/100, i);
+    }
 
-    b.unpin(pid);
-    b.flush(pid);
-    a.pfree(pid, 2);
-    cout << a.spaceMap() << endl;
-
-    b.bnew(page); b.bnew(page);
     cout << a.spaceMap() << endl;
   } catch(exception &e) {
     cerr << "IncDB terminated due to exception: "
