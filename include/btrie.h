@@ -78,11 +78,12 @@ namespace DB {
     static BTrie *load(page_id nid);
 
     /**
-     * BTrie::lookup
+     * BTrie::reserve
      *
-     * Look for a key in the node, and set the page_id and offset in the page
-     * at which to find said slot. If the slot does not exist, one is created
-     * for the key. The return value is used to propagate insertions
+     * Look for a key in the leaves of this tree. If there is no slot for this
+     * key, one is created. The page_id and the index in the leaf are output by
+     * assignment to the provided references. The return value is used to
+     * propagate insertions.
      *
      * @param nid  The page id of the node to look in.
      *
@@ -95,13 +96,11 @@ namespace DB {
      * @param &keyPos A reference to the position in the node where the slot can be
      *                found.
      *
-     * @return An update for the caller. The lookup may cause a node to be
-     *         split, in which case the caller must update its records to
-     *         reflect that. If no split occurred, then the split will have an
-     *         invalid page id. Furthermore, if no updates were made at all,
-     *         the key will be negative.
+     * @return An update for the caller. Reserving a slot for the key may cause
+     *         a node to be split, in which case the caller must update its
+     *         records to reflect that.
      */
-    static SplitInfo lookup(page_id nid, int key, page_id &pid, int &keyPos);
+    static SplitInfo reserve(page_id nid, int key, page_id &pid, int &keyPos);
 
     /**
      * BTrie::findKey

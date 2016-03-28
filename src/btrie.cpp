@@ -55,7 +55,7 @@ namespace DB {
   }
 
   BTrie::SplitInfo
-  BTrie::lookup(page_id nid, int key, page_id &pid, int &keyPos)
+  BTrie::reserve(page_id nid, int key, page_id &pid, int &keyPos)
   {
     BTrie    *node  = load(nid);
     int       pos   = node->findKey(key);
@@ -98,7 +98,7 @@ namespace DB {
       Global::BUFMGR->unpin(nid);
 
       // Traverse the appropriate child.
-      auto childSplit = lookup(childPID, key, pid, keyPos);
+      auto childSplit = reserve(childPID, key, pid, keyPos);
 
       // If the child made no splits, return.
       if (!childSplit.isSplit()) {
