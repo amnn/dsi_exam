@@ -30,30 +30,34 @@ namespace DB {
     };
 
     /**
+     * Propagate
+     *
+     * Tag designating how the child nodes were modified during insertions and
+     * deletions, so that the parent node may be updated appropriately.
+     */
+    enum Propagate {
+      PROP_NOTHING,
+      PROP_CHANGE,
+      PROP_SPLIT,
+      PROP_MERGE,
+      PROP_REDISTRIB,
+    };
+
+    /**
      * SplitInfo
      *
      * Returned by insertions to signal whether the insertion caused a split,
      * and if so, what should be put in the parent node.
      */
     struct SplitInfo {
+      Propagate prop;
       int key;
-      page_id pid;
 
-      inline bool
-      isSplit()
-      {
-        return pid != INVALID_PAGE;
-      }
-
-      inline bool
-      isNoChange()
-      {
-        return pid == INVALID_PAGE && key < 0;
-      }
+      union {
+        page_id pid;
+        Siblings sib;
+      };
     };
-
-    static constexpr SplitInfo NO_SPLIT  = {.key =  0, .pid = INVALID_PAGE};
-    static constexpr SplitInfo NO_CHANGE = {.key = -1, .pid = INVALID_PAGE};
 
     /**
      * BTrie::leaf
@@ -186,8 +190,9 @@ namespace DB {
      * slot. This function does not make sure there is enough room.
      *
      * @param index The position at which to make room.
+     * @param size  Number of slots to make room for (defaults to 1).
      */
-    void makeRoom(int index);
+    void makeRoom(int index, int size = 1);
 
   };
 

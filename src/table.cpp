@@ -28,7 +28,7 @@ namespace DB {
     auto rootSplit = BTrie::reserve(mRootPID, x, BTrie::NO_SIBS, rootLID, rootPos);
 
     // If no insertion was needed.
-    if (rootSplit.isNoChange()) {
+    if (rootSplit.prop == BTrie::PROP_NOTHING) {
       BTrie * rootLeaf = BTrie::load(rootLID);
       page_id subPID   = rootLeaf->slot(rootPos)[1];
 
@@ -37,20 +37,20 @@ namespace DB {
 
       // A split occurred in the sub index, so we need to create a new root node
       // for it and replace the slot in the leaf of the root index
-      if (subSplit.isSplit()) {
+      if (subSplit.prop == BTrie::PROP_SPLIT) {
         rootLeaf->slot(rootPos)[1] = BTrie::branch(subPID, subSplit.key, subSplit.pid);
         Global::BUFMGR->unpin(rootLID, true);
       } else {
         Global::BUFMGR->unpin(rootLID);
       }
 
-      return !subSplit.isNoChange();
+      return subSplit.prop != BTrie::PROP_NOTHING;
     }
 
     // Otherwise the reservation caused an insertion.
 
     // Update the root PID if we had to split it.
-    if (rootSplit.isSplit()) {
+    if (rootSplit.prop == BTrie::PROP_SPLIT) {
       mRootPID = BTrie::branch(mRootPID, rootSplit.key, rootSplit.pid);
     }
 

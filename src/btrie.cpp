@@ -59,7 +59,8 @@ namespace DB {
   {
     BTrie    *node  = load(nid);
     int       pos   = node->findKey(key);
-    SplitInfo split = NO_CHANGE;
+    SplitInfo split = {};
+    split.prop = PROP_NOTHING;
 
     switch (node->type) {
     case Leaf:
@@ -67,9 +68,89 @@ namespace DB {
 
       // Add the key if it is not there.
       if (pos == node->count || *node->slot(pos) != key) {
-        split = NO_SPLIT;
+        split.prop = PROP_CHANGE;
 
-        // Split the node if it is full.
+        // Try Redistributing Left
+        if (node->isFull() && (LEFT_SIB & sibs)) {
+          BTrie *left = load(node->prev);
+
+          if (left->isFull()) {
+            Global::BUFMGR->unpin(node->prev);
+          } else {
+            split.prop = PROP_REDISTRIB;
+            split.sib  = LEFT_SIB;
+
+            int total = node->count + left->count + 1;
+            int delta = total / 2 - left->count;
+
+            // Fix indices according to which node the new key belongs to.
+            if (pos < delta) {
+              delta--;
+              pid  = node->prev;
+              pos += left->count;
+            } else {
+              pos -= delta;
+            }
+
+            // Shift the nodes over
+            memmove(left->slot(left->count), node->slot(0),
+                    delta * node->l.stride * sizeof(int));
+            left->count += delta;
+            node->makeRoom(delta, -delta);
+
+            split.key = pid == node->prev && pos == left->count
+              ? key
+              : left->slot(left->count - 1)[0];
+
+            // Clean up
+            if (pid == nid) {
+              Global::BUFMGR->unpin(node->prev, true);
+            } else {
+              Global::BUFMGR->unpin(nid, true);
+              node = left;
+            }
+          }
+        }
+
+        // Try Redistributing Right
+        if (node->isFull() && (RIGHT_SIB & sibs)) {
+          BTrie *right = load(node->next);
+
+          if (right->isFull()) {
+            Global::BUFMGR->unpin(node->next);
+          } else {
+            split.prop = PROP_REDISTRIB;
+            split.sib  = RIGHT_SIB;
+
+            int total = node->count + right->count + 1;
+            int delta = total / 2 - right->count;
+            int keep  = node->count - delta;
+
+            if (pos > keep) {
+              delta--;
+              pos -= keep + 1;
+              pid  = node->next;
+            }
+
+            right->makeRoom(0, delta);
+            memmove(right->slot(0), node->slot(keep),
+                    delta * node->l.stride * sizeof(int));
+            node->count = keep;
+
+            split.key = pid == nid && pos == keep
+              ? key
+              : node->slot(node->count - 1)[0];
+
+            if (pid == nid) {
+              Global::BUFMGR->unpin(node->next, true);
+            } else {
+              Global::BUFMGR->unpin(nid, true);
+              node = right;
+            }
+          }
+        }
+
+        // We have no choice but to split.
         if (node->isFull()) {
           int pivot;
           split = node->split(nid, pivot);
@@ -105,17 +186,25 @@ namespace DB {
       // Traverse the appropriate child.
       auto childSplit = reserve(childPID, key, childSibs, pid, keyPos);
 
-      // If the child made no splits, return.
-      if (!childSplit.isSplit()) {
+      // If we don't need to update this node, then return.
+      if (childSplit.prop != PROP_SPLIT && childSplit.prop != PROP_REDISTRIB) {
         split = childSplit;
         break;
       } else {
-        split = NO_SPLIT;
+        split.prop = PROP_CHANGE;
       }
 
-      // Otherwise, put the new partition into this node
-      // (Splitting if necessary.)
       node = load(nid);
+      if (childSplit.prop == PROP_REDISTRIB) {
+        if (childSplit.sib == RIGHT_SIB)
+          node->slot(pos)[0] = childSplit.key;
+        else
+          node->slot(pos - 1)[0] = childSplit.key;
+
+        Global::BUFMGR->unpin(nid, true);
+        break;
+      }
+
       if (node->isFull()) {
         int pivot;
         split = node->split(nid, pivot);
@@ -165,8 +254,11 @@ namespace DB {
     BTrie *node = (BTrie *)page;
     node->type = type;
 
+    SplitInfo info {};
+    info.prop = PROP_SPLIT;
+    info.pid  = nid;
+
     pivot = count / 2;
-    int key;
     switch (type) {
     case Leaf:
       // Move half the records.
@@ -177,7 +269,7 @@ namespace DB {
       count          = pivot;
       node->l.stride = l.stride;
 
-      key = slot(pivot - 1)[0];
+      info.key = slot(pivot - 1)[0];
       break;
     case Branch:
       // Move half the children, excluding the pivot key, which we push up.
@@ -187,7 +279,7 @@ namespace DB {
       node->count = count - pivot - 1;
       count       = pivot;
 
-      key = slot(pivot)[0];
+      info.key = slot(pivot)[0];
       break;
     }
 
@@ -197,20 +289,21 @@ namespace DB {
     next       = nid;
 
     Global::BUFMGR->unpin(nid, true);
-    return {.key = key, .pid = nid};
+
+    return info;
   }
 
   void
-  BTrie::makeRoom(int index)
+  BTrie::makeRoom(int index, int size)
   {
     int stride = type == Leaf
       ? l.stride
       : BRANCH_STRIDE;
 
-    memmove(slot(index + 1), slot(index),
+    memmove(slot(index + size), slot(index),
             (count - index) * stride * sizeof(int));
 
-    count++;
+    count += size;
   }
 
   bool
