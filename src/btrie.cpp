@@ -288,6 +288,12 @@ namespace DB {
     node->next = next;
     next       = nid;
 
+    if (node->next != INVALID_PAGE) {
+      BTrie *nbr = load(node->next);
+      nbr->prev = nid;
+      Global::BUFMGR->unpin(node->next, true);
+    }
+
     Global::BUFMGR->unpin(nid, true);
 
     return info;
