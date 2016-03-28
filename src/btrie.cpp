@@ -325,6 +325,19 @@ namespace DB {
     }
   }
 
+  bool
+  BTrie::isUnderOccupied() const
+  {
+    switch (type) {
+    case Leaf:
+      return count < LEAF_SPACE / l.stride / 2;
+    case Branch:
+      return count < (BRANCH_SPACE - 1) / BRANCH_STRIDE / 2;
+    default:
+      throw std::runtime_error("Unrecognised Node Type");
+    }
+  }
+
   int *
   BTrie::slot(int index)
   {

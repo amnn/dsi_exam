@@ -151,6 +151,13 @@ namespace DB {
     bool isFull() const;
 
     /**
+     * BTrie::isUnderOccupied
+     *
+     * Check if more than half the nodes are empty.
+     */
+    bool isUnderOccupied() const;
+
+    /**
      * BTrie::slot
      *
      * Get the pointer to the slot at a given index.
