@@ -55,7 +55,7 @@ namespace DB {
   }
 
   BTrie::SplitInfo
-  BTrie::reserve(page_id nid, int key, page_id &pid, int &keyPos)
+  BTrie::reserve(page_id nid, int key, Siblings sibs, page_id &pid, int &keyPos)
   {
     BTrie    *node  = load(nid);
     int       pos   = node->findKey(key);
@@ -95,10 +95,15 @@ namespace DB {
       break;
     case Branch: {
       int childPID = node->slot(pos)[-1];
+
+      Siblings childSibs = NO_SIBS;
+      if (pos > 0)            childSibs |= LEFT_SIB;
+      if (pos < node->count ) childSibs |= RIGHT_SIB;
+
       Global::BUFMGR->unpin(nid);
 
       // Traverse the appropriate child.
-      auto childSplit = reserve(childPID, key, pid, keyPos);
+      auto childSplit = reserve(childPID, key, childSibs, pid, keyPos);
 
       // If the child made no splits, return.
       if (!childSplit.isSplit()) {
@@ -232,5 +237,26 @@ namespace DB {
     default:
       throw std::runtime_error("Unrecognised Node Type");
     }
+  }
+
+  BTrie::Siblings
+  operator|(BTrie::Siblings s, BTrie::Siblings t)
+  {
+    using UL = std::underlying_type<BTrie::Siblings>::type;
+    return BTrie::Siblings(static_cast<UL>(s) | static_cast<UL>(t));
+  }
+
+  BTrie::Siblings
+  operator&(BTrie::Siblings s, BTrie::Siblings t)
+  {
+    using UL = std::underlying_type<BTrie::Siblings>::type;
+    return BTrie::Siblings(static_cast<UL>(s) & static_cast<UL>(t));
+  }
+
+  BTrie::Siblings &
+  operator|=(BTrie::Siblings &s, BTrie::Siblings t)
+  {
+    s = s | t;
+    return s;
   }
 }

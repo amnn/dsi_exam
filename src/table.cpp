@@ -25,7 +25,7 @@ namespace DB {
       std::swap(x, y);
 
     page_id rootLID; int rootPos;
-    auto rootSplit = BTrie::reserve(mRootPID, x, rootLID, rootPos);
+    auto rootSplit = BTrie::reserve(mRootPID, x, BTrie::NO_SIBS, rootLID, rootPos);
 
     // If no insertion was needed.
     if (rootSplit.isNoChange()) {
@@ -33,7 +33,7 @@ namespace DB {
       page_id subPID   = rootLeaf->slot(rootPos)[1];
 
       page_id subLID; int subPos;
-      auto subSplit = BTrie::reserve(subPID, y, subLID, subPos);
+      auto subSplit = BTrie::reserve(subPID, y, BTrie::NO_SIBS, subLID, subPos);
 
       // A split occurred in the sub index, so we need to create a new root node
       // for it and replace the slot in the leaf of the root index
@@ -58,7 +58,7 @@ namespace DB {
     page_id newLID = BTrie::leaf(1);
 
     page_id subLID; int subPos;
-    BTrie::reserve(newLID, y, subLID, subPos);
+    BTrie::reserve(newLID, y, BTrie::NO_SIBS, subLID, subPos);
 
     // Then we update the leaf with the page_id of the new sub index.
     BTrie * rootLeaf = BTrie::load(rootLID);

@@ -18,6 +18,18 @@ namespace DB {
   struct BTrie {
 
     /**
+     * Siblings
+     *
+     * Enum used to tell a child node which of its neighbours are siblings. This
+     * information is used when redistributing.
+     */
+    enum Siblings : unsigned int {
+      NO_SIBS   = 0,
+      LEFT_SIB  = 1 << 1,
+      RIGHT_SIB = 1 << 2
+    };
+
+    /**
      * SplitInfo
      *
      * Returned by insertions to signal whether the insertion caused a split,
@@ -89,6 +101,10 @@ namespace DB {
      *
      * @param key  The key to search for.
      *
+     * @param sibs Mask representing which neighbours of this node are
+     *             siblings. I.e. If both neighbours are siblings, it will have
+     *             a value of `LEFT_SIB | RIGHT_SIB`.
+     *
      * @param &pid A reference to a page_id that is set to the page_id for the
      *             leaf. This page is pinned by the routine, so the caller
      *             must unpin it once finished.
@@ -100,7 +116,7 @@ namespace DB {
      *         a node to be split, in which case the caller must update its
      *         records to reflect that.
      */
-    static SplitInfo reserve(page_id nid, int key, page_id &pid, int &keyPos);
+    static SplitInfo reserve(page_id nid, int key, Siblings sibs, page_id &pid, int &keyPos);
 
     /**
      * BTrie::findKey
@@ -174,6 +190,14 @@ namespace DB {
     void makeRoom(int index);
 
   };
+
+  /**
+   * Operators for combining Sibling masks whilst preserving type-safety.
+   */
+  BTrie::Siblings operator|(BTrie::Siblings, BTrie::Siblings);
+  BTrie::Siblings operator&(BTrie::Siblings, BTrie::Siblings);
+
+  BTrie::Siblings &operator|=(BTrie::Siblings &, BTrie::Siblings);
 }
 
 #endif // DB_BTRIE_H
