@@ -44,12 +44,12 @@ namespace DB {
     };
 
     /**
-     * SplitInfo
+     * Diff
      *
-     * Returned by insertions to signal whether the insertion caused a split,
-     * and if so, what should be put in the parent node.
+     * Returned by updates to signal what (if any) changes need to be made to a
+     * parent node to reflect the updates made to a child node.
      */
-    struct SplitInfo {
+    struct Diff {
       Propagate prop;
       int key;
 
@@ -118,7 +118,7 @@ namespace DB {
      *         a node to be split, or redistributed, in which case the caller
      *         must update its records to reflect that.
      */
-    static SplitInfo reserve(page_id nid, int key, Siblings sibs, page_id &pid, int &keyPos);
+    static Diff reserve(page_id nid, int key, Siblings sibs, page_id &pid, int &keyPos);
 
     /**
      * BTrie::findKey
@@ -141,7 +141,7 @@ namespace DB {
      * @return A struct containing the the key in the middle of the split, and
      *         the ID of the new page.
      */
-    SplitInfo split(page_id pid, int &pivot);
+    Diff split(page_id pid, int &pivot);
 
     /**
      * BTrie::isFull

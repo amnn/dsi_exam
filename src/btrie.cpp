@@ -54,12 +54,12 @@ namespace DB {
     return (BTrie *)Global::BUFMGR->pin(nid);
   }
 
-  BTrie::SplitInfo
+  BTrie::Diff
   BTrie::reserve(page_id nid, int key, Siblings sibs, page_id &pid, int &keyPos)
   {
-    BTrie    *node  = load(nid);
-    int       pos   = node->findKey(key);
-    SplitInfo split = {};
+    BTrie * node  = load(nid);
+    int     pos   = node->findKey(key);
+    Diff    split = {};
     split.prop = PROP_NOTHING;
 
     switch (node->type) {
@@ -245,7 +245,7 @@ namespace DB {
     return lo;
   }
 
-  BTrie::SplitInfo
+  BTrie::Diff
   BTrie::split(page_id pid, int &pivot)
   {
     // Allocate a new page
@@ -254,9 +254,9 @@ namespace DB {
     BTrie *node = (BTrie *)page;
     node->type = type;
 
-    SplitInfo info {};
-    info.prop = PROP_SPLIT;
-    info.pid  = nid;
+    Diff diff {};
+    diff.prop = PROP_SPLIT;
+    diff.pid  = nid;
 
     pivot = count / 2;
     switch (type) {
@@ -269,7 +269,7 @@ namespace DB {
       count          = pivot;
       node->l.stride = l.stride;
 
-      info.key = slot(pivot - 1)[0];
+      diff.key = slot(pivot - 1)[0];
       break;
     case Branch:
       // Move half the children, excluding the pivot key, which we push up.
@@ -279,7 +279,7 @@ namespace DB {
       node->count = count - pivot - 1;
       count       = pivot;
 
-      info.key = slot(pivot)[0];
+      diff.key = slot(pivot)[0];
       break;
     }
 
@@ -296,7 +296,7 @@ namespace DB {
 
     Global::BUFMGR->unpin(nid, true);
 
-    return info;
+    return diff;
   }
 
   void
