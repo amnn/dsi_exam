@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstring>
+#include <functional>
 #include <stdexcept>
 
 #include "allocator.h"
@@ -27,6 +28,17 @@ namespace DB {
       NO_SIBS   = 0,
       LEFT_SIB  = 1 << 1,
       RIGHT_SIB = 1 << 2
+    };
+
+    /**
+     * Family
+     *
+     * Information about sibling nodes, used for redistributions.
+     */
+    struct Family {
+      Siblings sibs;
+      int leftKey;
+      int rightKey;
     };
 
     /**
@@ -58,6 +70,13 @@ namespace DB {
         Siblings sib;
       };
     };
+
+    /**
+     * NodeType
+     *
+     * Enum to tag BTrie Nodes with their type (Leaf or Branch)
+     */
+    enum NodeType { Branch, Leaf };
 
     /**
      * BTrie::leaf
@@ -121,6 +140,28 @@ namespace DB {
     static Diff reserve(page_id nid, int key, Siblings sibs, page_id &pid, int &keyPos);
 
     /**
+     * BTrie::deleteIf
+     *
+     * Remove a key from the tree, if it exists in the key and satisfies the
+     * predicate. The return value is used to propagate the deletion upwards.
+     *
+     * @param nid  The page id of the node to look in.
+     *
+     * @param key  The key to delete.
+     *
+     * @param family Information about the node's siblings in its parent node.
+     *
+     * @param predicate Function used to determine whether the key should be
+     * deleted.
+     *
+     * @return An update for the caller. Deleting a slot may cause the node to
+     *         be merged or redistributed, which should be reflected in its
+     *         parent.
+     */
+    static Diff deleteIf(page_id nid, int key,
+                         Family family,
+                         std::function<bool(page_id, int)> predicate);
+    /**
      * BTrie::findKey
      *
      * @param key The key to search for.
@@ -142,6 +183,37 @@ namespace DB {
      *         the ID of the new page.
      */
     Diff split(page_id pid, int &pivot);
+
+    /**
+     * BTrie::merge
+     *
+     * Append the data from the other node, onto the end of this node's data
+     * section. Pre conditions include: The types of this node and that node
+     * must match, the two nodes must be neighbouring, and this node must have
+     * enough space for the data from both nodes.
+     *
+     * @param nid  The page_id of this node.
+     *
+     * @param that The node to merge into this one.
+     *
+     * @param part The key that partitions these two nodes (When merging
+     *             branches this needs to be added back in).
+     */
+    void merge(page_id nid, BTrie *that, int part);
+
+    /**
+     * BTrie::getType()
+     *
+     * Returns the type of the node.
+     */
+    NodeType getType() const;
+
+    /**
+     * BTrie::isEmpty
+     *
+     * Check if the node has no slots filled.
+     */
+    bool isEmpty() const;
 
     /**
      * BTrie::isFull
@@ -172,7 +244,7 @@ namespace DB {
     static const int BRANCH_SPACE;
     static const int LEAF_SPACE;
 
-    enum { Branch, Leaf } type;
+    NodeType type;
 
     int count;
     page_id prev, next;

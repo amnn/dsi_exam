@@ -67,4 +67,64 @@ namespace DB {
 
     return true;
   }
+
+  bool
+  Table::remove(int x, int y)
+  {
+    if (mIsReversed)
+      std::swap(x, y);
+
+    bool didChange = false;
+    BTrie::deleteIf(mRootPID, x, { .sibs = BTrie::NO_SIBS },
+                    [&didChange, y] (page_id rootLID, int rootPos) {
+                      BTrie *rootLeaf = BTrie::load(rootLID);
+                      page_id subPID  = rootLeaf->slot(rootPos)[1];
+
+                      // Delete the key in the sub-index.
+                      BTrie::deleteIf(subPID, y, { .sibs = BTrie::NO_SIBS },
+                                      [&didChange] (page_id, int) {
+                                        didChange = true;
+                                        return true;
+                                      });
+
+                      // Deal with the Sub-Index having an empty root.
+                      BTrie *sub = BTrie::load(subPID);
+
+                      if (sub->isEmpty()) {
+                        switch (sub->getType()) {
+                        case BTrie::Leaf:
+                          // Delete this sub-index entirely.
+                          Global::BUFMGR->unpin(subPID);
+                          Global::BUFMGR->bfree(subPID);
+
+                          Global::BUFMGR->unpin(rootLID);
+                          return true;
+                        case BTrie::Branch:
+                          // Replace the branch with its only child.
+                          rootLeaf->slot(rootPos)[1] = sub->slot(0)[-1];
+
+                          Global::BUFMGR->unpin(subPID);
+                          Global::BUFMGR->bfree(subPID);
+
+                          Global::BUFMGR->unpin(rootLID);
+                          return false;
+                        }
+                      }
+
+                      Global::BUFMGR->unpin(subPID);
+                      Global::BUFMGR->unpin(rootLID);
+                      return false;
+                    });
+
+    // Deal with the Root Index having an empty root node.
+    BTrie *root = BTrie::load(mRootPID);
+    if (root->isEmpty() && root->getType() == BTrie::Branch) {
+      // Replace the branch with its only child.
+      mRootPID = root->slot(0)[-1];
+      Global::BUFMGR->unpin(mRootPID);
+      Global::BUFMGR->bfree(mRootPID);
+    }
+
+    return didChange;
+  }
 }

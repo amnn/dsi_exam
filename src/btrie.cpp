@@ -229,6 +229,259 @@ namespace DB {
     return split;
   }
 
+  BTrie::Diff
+  BTrie::deleteIf(page_id nid, int key,
+                  Family family,
+                  std::function<bool(page_id, int)> predicate)
+  {
+    BTrie * node = load(nid);
+    int     pos  = node->findKey(key);
+    Diff    diff = {};
+    diff.prop = PROP_NOTHING;
+
+    switch (node->type) {
+    case Leaf:
+      if (pos == node->count
+          || node->slot(pos)[0] != key
+          || !predicate(nid, pos)
+          ) {
+        Global::BUFMGR->unpin(nid);
+        break;
+      }
+
+      // Delete the slot
+      diff.prop = PROP_CHANGE;
+      node->makeRoom(pos + 1, -1);
+
+      if (!node->isUnderOccupied()) {
+        Global::BUFMGR->unpin(nid, true);
+        break;
+      }
+
+      // Try Redistributing Left
+      if (family.sibs & LEFT_SIB) {
+        BTrie *left = load(node->prev);
+
+        if (left->isUnderOccupied()) {
+          Global::BUFMGR->unpin(node->prev);
+        } else {
+          diff.prop = PROP_REDISTRIB;
+          diff.sib  = LEFT_SIB;
+
+          int total = node->count + left->count;
+          int delta = (total - 1) / 2 - node->count + 1;
+          int keep  = left->count - delta;
+
+          node->makeRoom(0, delta);
+          memmove(node->slot(0), left->slot(keep),
+                  delta * node->l.stride * sizeof(int));
+          left->count = keep;
+
+          diff.key = left->slot(left->count - 1)[0];
+
+          Global::BUFMGR->unpin(node->prev, true);
+          Global::BUFMGR->unpin(nid, true);
+          break;
+        }
+      }
+
+      // Try Redistributing Right
+      if (family.sibs & RIGHT_SIB) {
+        BTrie *right = load(node->next);
+
+        if (right->isUnderOccupied())
+          Global::BUFMGR->unpin(node->next);
+        else {
+          diff.prop = PROP_REDISTRIB;
+          diff.sib  = RIGHT_SIB;
+
+          int total = node->count + right->count;
+          int delta = (total - 1) / 2 - node->count + 1;
+
+          memmove(node->slot(node->count), right->slot(0),
+                  delta * node->l.stride * sizeof(int));
+          node->count += delta;
+          right->makeRoom(delta, -delta);
+
+          diff.key = node->slot(node->count - 1)[0];
+
+          Global::BUFMGR->unpin(node->next, true);
+          Global::BUFMGR->unpin(nid, true);
+          break;
+        }
+      }
+
+      // Try Merging Left
+      if (family.sibs & LEFT_SIB) {
+        BTrie *left = load(node->prev);
+        diff.prop = PROP_MERGE;
+        diff.sib  = LEFT_SIB;
+
+        left->merge(node->prev, node, family.leftKey);
+
+        Global::BUFMGR->unpin(node->prev, true);
+        Global::BUFMGR->unpin(nid);
+        break;
+      }
+
+      // Try Merging Right
+      if (family.sibs & RIGHT_SIB) {
+        BTrie *right = load(node->next);
+        diff.prop = PROP_MERGE;
+        diff.sib  = RIGHT_SIB;
+
+        node->merge(node->next, right, family.rightKey);
+
+        Global::BUFMGR->unpin(nid, true);
+        Global::BUFMGR->unpin(node->next);
+        break;
+      }
+
+      break;
+    case Branch: {
+      int childPID = node->slot(pos)[-1];
+
+      Family childFamily {};
+      if (pos > 0) {
+        childFamily.sibs    |= LEFT_SIB;
+        childFamily.leftKey  = node->slot(pos - 1)[0];
+      }
+
+      if (pos < node->count) {
+        childFamily.sibs |= RIGHT_SIB;
+        childFamily.rightKey = node->slot(pos)[0];
+      }
+
+      // Traverse the appropriate child.
+      Diff childDiff = deleteIf(childPID, key, childFamily, predicate);
+
+      // If we don't need to update this node, then return.
+      if (childDiff.prop != PROP_MERGE && childDiff.prop != PROP_REDISTRIB) {
+        diff = childDiff;
+        break;
+      } else {
+        diff.prop = PROP_CHANGE;
+      }
+
+      // Fix the partitioning key in the case of a redistribution.
+      node = load(nid);
+      if (childDiff.prop == PROP_REDISTRIB) {
+        if (childDiff.sib == RIGHT_SIB)
+          node->slot(pos)[0] = childDiff.key;
+        else
+          node->slot(pos - 1)[0] = childDiff.key;
+
+        Global::BUFMGR->unpin(nid, true);
+        break;
+      }
+
+      // Otherwise we must deal with a merge.
+      if (childDiff.sib == RIGHT_SIB) {
+        int toFree = node->slot(pos)[0];
+
+        node->makeRoom(pos + 1, -1);
+        Global::BUFMGR->bfree(toFree);
+      } else if (childDiff.sib == LEFT_SIB) {
+        int toFree = node->slot(pos - 1)[0];
+
+        node->makeRoom(pos, -1);
+        Global::BUFMGR->bfree(toFree);
+      }
+
+      if (!node->isUnderOccupied()) {
+        Global::BUFMGR->unpin(nid, true);
+        break;
+      }
+
+      // Try Redistributing Left
+      if (family.sibs & LEFT_SIB) {
+        BTrie *left = load(node->prev);
+
+        if (left->isUnderOccupied()) {
+          Global::BUFMGR->unpin(node->prev);
+        } else {
+          diff.prop = PROP_REDISTRIB;
+          diff.sib  = LEFT_SIB;
+
+          int total = node->count + left->count;
+          int delta = (total - 1)/ 2 - node->count + 1;
+          int keep  = left->count - delta;
+
+          node->makeRoom(0, delta);
+          node->slot(delta - 1)[0] = family.leftKey;
+          node->slot(delta - 1)[1] = node->slot(0)[-1];
+          memmove(node->slot(0) - 1, left->slot(keep) + 1,
+                  (delta * BRANCH_STRIDE - 1) * sizeof(int));
+          left->count = keep;
+
+          diff.key = left->slot(left->count)[0];
+
+          Global::BUFMGR->unpin(node->prev, true);
+          Global::BUFMGR->unpin(nid, true);
+          break;
+        }
+      }
+
+      // Try Redistributing Right
+      if (family.sibs & RIGHT_SIB) {
+        BTrie *right = load(node->next);
+
+        if (right->isUnderOccupied()) {
+          Global::BUFMGR->unpin(node->next);
+        } else {
+          diff.prop = PROP_REDISTRIB;
+          diff.sib  = RIGHT_SIB;
+
+          int total = node->count + right->count;
+          int delta = (total - 1) / 2 - node->count + 1;
+
+          node->slot(node->count)[0] = family.rightKey;
+          memmove(node->slot(node->count) + 1, right->slot(0) - 1,
+                  (delta * BRANCH_STRIDE - 1) * sizeof(int));
+          node->count += delta;
+
+          diff.key           = right->slot(delta - 1)[0];
+          right->slot(0)[-1] = right->slot(delta)[-1];
+
+          right->makeRoom(delta, -delta);
+
+          Global::BUFMGR->unpin(node->prev, true);
+          Global::BUFMGR->unpin(nid, true);
+          break;
+        }
+
+        // Try Merging Left
+        if (family.sibs && LEFT_SIB) {
+          BTrie *left = load(node->prev);
+          diff.prop = PROP_MERGE;
+          diff.sib  = LEFT_SIB;
+
+          left->merge(node->prev, node, family.leftKey);
+
+          Global::BUFMGR->unpin(node->prev, true);
+          Global::BUFMGR->unpin(nid);
+          break;
+        }
+
+        // Try Merging Right
+        if (family.sibs && RIGHT_SIB) {
+          BTrie *right = load(node->next);
+          diff.prop = PROP_MERGE;
+          diff.sib = RIGHT_SIB;
+
+          node->merge(node->next, right, family.rightKey);
+          Global::BUFMGR->unpin(nid, true);
+          Global::BUFMGR->unpin(node->next);
+          break;
+        }
+      }
+      break;
+    }
+    }
+
+    return diff;
+  }
+
   int
   BTrie::findKey(int key)
   {
@@ -300,6 +553,33 @@ namespace DB {
   }
 
   void
+  BTrie::merge(page_id nid, BTrie *that, int part)
+  {
+    switch (type) {
+    case Leaf:
+      memmove(slot(count), that->slot(0),
+              that->count * l.stride * sizeof(int));
+      count += that->count;
+      break;
+    case Branch:
+      slot(count)[0] = part;
+      memmove(slot(count) + 1, that->slot(0) - 1,
+              (1 + that->count * BRANCH_STRIDE) * sizeof(int));
+      count += that->count + 1;
+      break;
+    }
+
+    // Fix neighbour pointers
+    next = that->next;
+
+    if (next != INVALID_PAGE) {
+      BTrie *newNext = load(next);
+      newNext->prev = nid;
+      Global::BUFMGR->unpin(next, true);
+    }
+  }
+
+  void
   BTrie::makeRoom(int index, int size)
   {
     int stride = type == Leaf
@@ -310,6 +590,18 @@ namespace DB {
             (count - index) * stride * sizeof(int));
 
     count += size;
+  }
+
+  BTrie::NodeType
+  BTrie::getType() const
+  {
+    return type;
+  }
+
+  bool
+  BTrie::isEmpty() const
+  {
+    return count == 0;
   }
 
   bool
@@ -330,9 +622,9 @@ namespace DB {
   {
     switch (type) {
     case Leaf:
-      return count < LEAF_SPACE / l.stride / 2;
+      return count <= LEAF_SPACE / l.stride / 2;
     case Branch:
-      return count < (BRANCH_SPACE - 1) / BRANCH_STRIDE / 2;
+      return count <= ((BRANCH_SPACE - 1) / BRANCH_STRIDE - 1) / 2;
     default:
       throw std::runtime_error("Unrecognised Node Type");
     }
