@@ -289,9 +289,9 @@ namespace DB {
       if (family.sibs & RIGHT_SIB) {
         BTrie *right = load(node->next);
 
-        if (right->isUnderOccupied())
+        if (right->isUnderOccupied()) {
           Global::BUFMGR->unpin(node->next);
-        else {
+        } else {
           diff.prop = PROP_REDISTRIB;
           diff.sib  = RIGHT_SIB;
 
@@ -313,30 +313,33 @@ namespace DB {
 
       // Try Merging Left
       if (family.sibs & LEFT_SIB) {
-        BTrie *left = load(node->prev);
+        page_id lid = node->prev;
+        BTrie *left = load(lid);
         diff.prop = PROP_MERGE;
         diff.sib  = LEFT_SIB;
 
-        left->merge(node->prev, node, family.leftKey);
+        left->merge(lid, node, family.leftKey);
 
-        Global::BUFMGR->unpin(node->prev, true);
+        Global::BUFMGR->unpin(lid, true);
         Global::BUFMGR->unpin(nid);
         break;
       }
 
       // Try Merging Right
       if (family.sibs & RIGHT_SIB) {
-        BTrie *right = load(node->next);
+        page_id rid  = node->next;
+        BTrie *right = load(rid);
         diff.prop = PROP_MERGE;
         diff.sib  = RIGHT_SIB;
 
-        node->merge(node->next, right, family.rightKey);
+        node->merge(nid, right, family.rightKey);
 
         Global::BUFMGR->unpin(nid, true);
-        Global::BUFMGR->unpin(node->next);
+        Global::BUFMGR->unpin(rid);
         break;
       }
 
+      Global::BUFMGR->unpin(nid, true);
       break;
     case Branch: {
       int childPID = node->slot(pos)[-1];
@@ -351,6 +354,8 @@ namespace DB {
         childFamily.sibs |= RIGHT_SIB;
         childFamily.rightKey = node->slot(pos)[0];
       }
+
+      Global::BUFMGR->unpin(nid);
 
       // Traverse the appropriate child.
       Diff childDiff = deleteIf(childPID, key, childFamily, predicate);
@@ -377,12 +382,12 @@ namespace DB {
 
       // Otherwise we must deal with a merge.
       if (childDiff.sib == RIGHT_SIB) {
-        int toFree = node->slot(pos)[0];
+        int toFree = node->slot(pos)[+1];
 
         node->makeRoom(pos + 1, -1);
         Global::BUFMGR->bfree(toFree);
       } else if (childDiff.sib == LEFT_SIB) {
-        int toFree = node->slot(pos - 1)[0];
+        int toFree = node->slot(pos)[-1];
 
         node->makeRoom(pos, -1);
         Global::BUFMGR->bfree(toFree);
@@ -445,36 +450,40 @@ namespace DB {
 
           right->makeRoom(delta, -delta);
 
-          Global::BUFMGR->unpin(node->prev, true);
+          Global::BUFMGR->unpin(node->next, true);
           Global::BUFMGR->unpin(nid, true);
-          break;
-        }
-
-        // Try Merging Left
-        if (family.sibs && LEFT_SIB) {
-          BTrie *left = load(node->prev);
-          diff.prop = PROP_MERGE;
-          diff.sib  = LEFT_SIB;
-
-          left->merge(node->prev, node, family.leftKey);
-
-          Global::BUFMGR->unpin(node->prev, true);
-          Global::BUFMGR->unpin(nid);
-          break;
-        }
-
-        // Try Merging Right
-        if (family.sibs && RIGHT_SIB) {
-          BTrie *right = load(node->next);
-          diff.prop = PROP_MERGE;
-          diff.sib = RIGHT_SIB;
-
-          node->merge(node->next, right, family.rightKey);
-          Global::BUFMGR->unpin(nid, true);
-          Global::BUFMGR->unpin(node->next);
           break;
         }
       }
+
+      // Try Merging Left
+      if (family.sibs & LEFT_SIB) {
+        page_id lid = node->prev;
+        BTrie *left = load(lid);
+        diff.prop   = PROP_MERGE;
+        diff.sib    = LEFT_SIB;
+
+        left->merge(lid, node, family.leftKey);
+
+        Global::BUFMGR->unpin(lid, true);
+        Global::BUFMGR->unpin(nid);
+        break;
+      }
+
+      // Try Merging Right
+      if (family.sibs & RIGHT_SIB) {
+        page_id rid  = node->next;
+        BTrie *right = load(rid);
+        diff.prop    = PROP_MERGE;
+        diff.sib     = RIGHT_SIB;
+
+        node->merge(nid, right, family.rightKey);
+        Global::BUFMGR->unpin(nid, true);
+        Global::BUFMGR->unpin(rid);
+        break;
+      }
+
+      Global::BUFMGR->unpin(nid, true);
       break;
     }
     }

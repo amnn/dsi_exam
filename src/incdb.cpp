@@ -21,20 +21,74 @@ main(int, char **)
 
     DB::Table t1(0, 1);
 
-    cout << "Inserting...";
-    for(int i = 0; i < 32; ++i) {
-      if (!t1.insert(i + 1, 1))
-        cout << "Hmm, this should be true" << endl;
-    }
-    cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
 
-    cout << "Re-inserting...";
-    for(int i = 0; i < 32; ++i) {
-      if (t1.insert(i + 1, 1)) {
-        cout << "Hmm, I've already inserted " << i + 1 << endl;
-      }
+    cout << "I1...";
+    for (int i = 0; i < 32; ++i) {
+      if (!t1.insert(i + 1, 1))
+        cout << "!I " << i + 1 << endl;
     }
     cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
+
+    cout << "R1...";
+    for (int i = 31; i >= 0; --i) {
+      if (!t1.remove(i + 1, 1))
+        cout << "!R " << i + 1 << endl;
+    }
+    cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
+
+    cout << "R2...";
+    for (int i = 0; i < 32; ++i) {
+      if (t1.remove(i + 1, 1))
+        cout << "!R " << i + 1 << endl;
+    }
+    cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
+
+    cout << "I2...";
+    for (int i = 31; i >= 0; --i) {
+      if (!t1.insert(i + 1, 1))
+        cout << "!I " << i + 1 << endl;
+    }
+    cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
+
+    cout << "R3...";
+    for (int i = 31; i >= 0; --i) {
+      if (!t1.remove(i + 1, 1))
+        cout << "!R " << i + 1 << endl;
+    }
+    cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
+
+    cout << "R4...";
+    for (int i = 0; i < 32; ++i) {
+      if (t1.remove(i + 1, 1))
+        cout << "!R " << i + 1 << endl;
+    }
+    cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
+
+    cout << "I3...";
+    for (int i = 0; i < 32; ++i) {
+      if (!t1.insert(i + 1, 1))
+        cout << "!I " << i + 1 << endl;
+    }
+    cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
+
+    cout << "I4...";
+    for (int i = 0; i < 32; ++i) {
+      if (t1.insert(i + 1, 1))
+        cout << "!I " << i + 1 << endl;
+    }
+    cout << "Done." << endl;
+    cout << a.spaceMap() << endl;
+
+    /**
+    */
 
   } catch(exception &e) {
     cerr << "IncDB terminated due to exception: "

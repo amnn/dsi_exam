@@ -47,11 +47,11 @@ namespace DB {
 
     int fid = findFrame(pid);
     if (fid == INVALID_FRAME)
-      throw std::runtime_error("Invalid Page!");
+      throw std::runtime_error("Page Not Pinned!");
 
     Frame &frame = mFrames[fid];
     if (frame.getPageID() != pid || !frame.isPinned())
-      throw std::runtime_error("Invalid Page!");
+      throw std::runtime_error("Page Not Pinned!");
 
     if (dirty) frame.mark();
     frame.unpin();

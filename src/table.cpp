@@ -106,7 +106,7 @@ namespace DB {
                           Global::BUFMGR->unpin(subPID);
                           Global::BUFMGR->bfree(subPID);
 
-                          Global::BUFMGR->unpin(rootLID);
+                          Global::BUFMGR->unpin(rootLID, true);
                           return false;
                         }
                       }
@@ -120,9 +120,12 @@ namespace DB {
     BTrie *root = BTrie::load(mRootPID);
     if (root->isEmpty() && root->getType() == BTrie::Branch) {
       // Replace the branch with its only child.
-      mRootPID = root->slot(0)[-1];
+      page_id newRoot = root->slot(0)[-1];
       Global::BUFMGR->unpin(mRootPID);
       Global::BUFMGR->bfree(mRootPID);
+      mRootPID = newRoot;
+    } else {
+      Global::BUFMGR->unpin(mRootPID);
     }
 
     return didChange;
