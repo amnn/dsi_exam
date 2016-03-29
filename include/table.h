@@ -1,5 +1,7 @@
 #include <cstddef>
 
+#include <memory>
+
 #include "allocator.h"
 #include "dim.h"
 #include "trie_iterator.h"
@@ -50,11 +52,11 @@ namespace DB {
     /**
      * Table::scan
      *
-     * @return An iterator that can traverse the contents of the table. The
-     * iterator moves in only one direction, and its behaviour is undefined if
-     * the table is modified whilst it is in use.
+     * @return A pointer to an iterator that can traverse the contents of the
+     * table. The iterator moves in only one direction, and its behaviour is
+     * undefined if the table is modified whilst it is in use.
      */
-    TrieIterator scan();
+    std::unique_ptr<TrieIterator> scan();
 
   private:
 
