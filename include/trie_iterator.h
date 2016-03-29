@@ -1,3 +1,6 @@
+#ifndef DB_TRIE_ITERATOR_H
+#define DB_TRIE_ITERATOR_H
+
 namespace DB {
   /**
    * TrieIterator
@@ -42,3 +45,5 @@ namespace DB {
     virtual bool atEnd() const = 0;
   };
 }
+
+#endif // DB_TRIE_ITERATOR

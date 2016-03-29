@@ -6,6 +6,7 @@
 
 #include "allocator.h"
 #include "btrie.h"
+#include "btrie_iterator.h"
 #include "bufmgr.h"
 #include "db.h"
 
@@ -129,5 +130,12 @@ namespace DB {
     }
 
     return didChange;
+  }
+
+  std::unique_ptr<TrieIterator>
+  Table::scan()
+  {
+    BTrieIterator *it = new BTrieIterator(mRootPID, mRootOrder, mSubOrder);
+    return std::unique_ptr<TrieIterator>(it);
   }
 }

@@ -103,6 +103,21 @@ namespace DB {
     static page_id branch(page_id left, int key, page_id right);
 
     /**
+     * BTrie::onHeap
+     *
+     * Create a free-standing BTrie node, outside of database managed pages, in
+     * just enough memory to hold the required number of slots at the given size.
+     *
+     * @param stride The size of each slot
+     * @param size   The number of slots.
+     *
+     * @return A pointer to memory allocated on the heap holding the node. It is
+     *         returned as a char pointer because that is how it is allocated,
+     *         and how it should be freed (using delete[]).
+     */
+    static char * onHeap(int stride, int size);
+
+    /**
      * BTrie::load
      *
      * Load a page in and cast it as a BTrie.
@@ -161,6 +176,7 @@ namespace DB {
     static Diff deleteIf(page_id nid, int key,
                          Family family,
                          std::function<bool(page_id, int)> predicate);
+
     /**
      * BTrie::findKey
      *
@@ -202,11 +218,32 @@ namespace DB {
     void merge(page_id nid, BTrie *that, int part);
 
     /**
-     * BTrie::getType()
+     * BTrie::getType
      *
-     * Returns the type of the node.
+     * @return The type of the node.
      */
     NodeType getType() const;
+
+    /**
+     * BTrie::getCount
+     *
+     * @return The number of children in this BTrie node.
+     */
+    int getCount() const;
+
+    /**
+     * BTrie::getPrev
+     *
+     * @return The Page ID of the node previous to this one.
+     */
+    page_id getPrev() const;
+
+    /**
+     * BTrie::getNext
+     *
+     * @return The Page ID of the node after this one.
+     */
+    page_id getNext() const;
 
     /**
      * BTrie::isEmpty
@@ -243,6 +280,14 @@ namespace DB {
     static const int BRANCH_STRIDE;
     static const int BRANCH_SPACE;
     static const int LEAF_SPACE;
+
+    /**
+     * BTrie::BTrie
+     *
+     * Default constructor. Made private so that BTrie's static functions must
+     * be used to create instances.
+     */
+    BTrie() = default;
 
     NodeType type;
 

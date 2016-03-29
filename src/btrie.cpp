@@ -48,6 +48,23 @@ namespace DB {
     return bid;
   }
 
+  char *
+  BTrie::onHeap(int stride, int size)
+  {
+    std::size_t bytes = offsetof(BTrie, l.data);
+    bytes            += size * stride * sizeof(int);
+
+    char  * buf  = new char[bytes]();
+    BTrie * node = (BTrie *)buf;
+
+    node->type     = Leaf;
+    node->count    = size;
+    node->prev     = INVALID_PAGE;
+    node->next     = INVALID_PAGE;
+    node->l.stride = stride;
+
+    return buf;
+  }
   BTrie *
   BTrie::load(page_id nid)
   {
@@ -605,6 +622,24 @@ namespace DB {
   BTrie::getType() const
   {
     return type;
+  }
+
+  int
+  BTrie::getCount() const
+  {
+    return count;
+  }
+
+  page_id
+  BTrie::getPrev() const
+  {
+    return prev;
+  }
+
+  page_id
+  BTrie::getNext() const
+  {
+    return next;
   }
 
   bool
