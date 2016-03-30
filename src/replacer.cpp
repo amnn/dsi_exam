@@ -5,7 +5,6 @@
 namespace DB {
   Replacer::Replacer(Frame *frames, int poolSize)
     : mFrames(frames)
-    , mPoolSize(poolSize)
     , mAllNodes(new Node[poolSize]())
     , mFree()
   {

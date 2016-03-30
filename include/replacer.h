@@ -26,7 +26,6 @@ namespace DB {
     };
 
     Frame * mFrames;
-    int     mPoolSize;
     Node  * mAllNodes;
     Node    mFree;
   };
