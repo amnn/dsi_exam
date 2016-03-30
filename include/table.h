@@ -58,6 +58,19 @@ namespace DB {
      */
     std::unique_ptr<TrieIterator> scan();
 
+    /**
+     * Table::singleton
+     *
+     * Produce an iterator for a one record slice of the table.
+     *
+     * @param x The value of the record's first column.
+     * @param y The value of the record's second column.
+
+     * @return An iterator containing just the record [x, y] as if it originated from
+     * an iterator for this table.
+     */
+    std::unique_ptr<TrieIterator> singleton(int x, int y);
+
   private:
 
     page_id mRootPID;

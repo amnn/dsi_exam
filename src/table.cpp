@@ -9,6 +9,7 @@
 #include "btrie_iterator.h"
 #include "bufmgr.h"
 #include "db.h"
+#include "singleton_iterator.h"
 
 namespace DB {
 
@@ -136,6 +137,15 @@ namespace DB {
   Table::scan()
   {
     BTrieIterator *it = new BTrieIterator(mRootPID, mRootOrder, mSubOrder);
+    return std::unique_ptr<TrieIterator>(it);
+  }
+
+  std::unique_ptr<TrieIterator>
+  Table::singleton(int x, int y)
+  {
+    if (mIsReversed) std::swap(x, y);
+
+    SingletonIterator *it = new SingletonIterator(mRootOrder, x, mSubOrder, y);
     return std::unique_ptr<TrieIterator>(it);
   }
 }
