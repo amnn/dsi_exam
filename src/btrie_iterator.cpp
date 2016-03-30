@@ -32,12 +32,16 @@ namespace DB {
   void
   BTrieIterator::open()
   {
+    if (atEnd()) throw std::runtime_error("open: iterator finished!");
+
     mCurrDepth++;
-    if (!atValidDepth() || mCurrDepth == mNodeDepth)
+    if (!(atValidDepth()    ||
+          mCurrDepth == -1) ||
+        mCurrDepth == mNodeDepth)
       return;
 
     // Save position at current level
-    mHistory.emplace(std::make_pair(mPID, mPos));
+    mHistory.emplace(std::make_tuple(mPID, mPos, mNodeDepth));
 
     // Find the leftmost child
     int cid = mCurr->slot(mPos)[1];
@@ -61,18 +65,17 @@ namespace DB {
   BTrieIterator::up()
   {
     mCurrDepth--;
-    if (!atValidDepth() || mCurrDepth == mNodeDepth)
+    if (mCurrDepth >= mNodeDepth)
       return;
 
     // Recover old position from history and swap it in.
     if (mPID != INVALID_PAGE)
       Global::BUFMGR->unpin(mPID);
 
-    mNodeDepth = mCurrDepth;
-
-    auto past = mHistory.top();
-    mPID = std::get<0>(past);
-    mPos = std::get<1>(past);
+    auto past  = mHistory.top();
+    mPID       = std::get<0>(past);
+    mPos       = std::get<1>(past);
+    mNodeDepth = std::get<2>(past);
 
     mCurr = mPID == INVALID_PAGE
       ? mDummy
@@ -84,7 +87,7 @@ namespace DB {
   void
   BTrieIterator::next()
   {
-    if (!atValidDepth() || mCurrDepth < 0 || atEnd()) return;
+    if (!atValidDepth() || atEnd()) return;
 
     mPos++;
 
@@ -103,7 +106,7 @@ namespace DB {
   void
   BTrieIterator::seek(int searchKey)
   {
-    if (!atValidDepth() || mCurrDepth < 0 || atEnd()) return;
+    if (!atValidDepth() || atEnd()) return;
 
     searchKey   = std::max(searchKey, key());
 
@@ -127,7 +130,7 @@ namespace DB {
   int
   BTrieIterator::key() const
   {
-    if (!atValidDepth() || mCurrDepth < 0)
+    if (!atValidDepth())
       return std::numeric_limits<int>::min();
 
     if (atEnd())
@@ -141,7 +144,6 @@ namespace DB {
   {
     return
       atValidDepth()            &&
-      mCurrDepth >= 0           &&
       mPos >= mCurr->getCount() &&
       mCurr->getNext() == INVALID_PAGE;
   }
@@ -150,7 +152,6 @@ namespace DB {
   BTrieIterator::atValidDepth() const
   {
     return
-      mCurrDepth == -1   ||
       mCurrDepth == mFst ||
       mCurrDepth == mSnd;
   }

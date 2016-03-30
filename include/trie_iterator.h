@@ -60,6 +60,15 @@ namespace DB {
      * @return true iff the iterator is past the last key at the current level.
      */
     virtual bool atEnd() const = 0;
+
+    /**
+     * TrieIterator::atValidDepth
+     *
+     * @return true iff This iterator has a column at the depth the iterator is
+     *         currently at. (i.e. If the iterator should participate in a join
+     *         at this depth).
+     */
+    virtual bool atValidDepth() const = 0;
   };
 }
 

@@ -2,13 +2,18 @@
 #define DB_BTRIE_ITERATOR_H
 
 #include <stack>
-#include <utility>
+#include <tuple>
 
 #include "allocator.h"
 #include "btrie.h"
 #include "trie_iterator.h"
 
 namespace DB {
+  /**
+   * BTrieIterator
+   *
+   * A Trie Iterator for traversing data stored in Nested B+-Tries.
+   */
   struct BTrieIterator : public TrieIterator {
 
     /**
@@ -19,10 +24,11 @@ namespace DB {
      *
      * @param rootPID The page_id for the root node of the BTrie being iterated over.
      * @param fst     The position of the table's 1st parameter in the ordering.
-     * @param snd     The position of the table's 2nd parameter in the ordering.
-     *                It is assumed that fst < snd. That is to say, a table must
-     *                contain two different paramaters, with the first appearing
-     *                before the second, always.
+     * @param snd     The position of the table's 2nd parameter in the ordering. It
+     *                is assumed that fst < snd. That is to say, a table must
+     *                contain two different query paramaters, with the first
+     *                appearing before the second, always. (There is no restriction
+     *                on the values held in these columns).
      */
     BTrieIterator(page_id rootPID, int fst, int snd);
 
@@ -39,36 +45,34 @@ namespace DB {
 
     /** TrieIterator method overrides */
 
-    void open()              override;
-    void up()                override;
-    void next()              override;
-    void seek(int searchKey) override;
+    void open()               override;
+    void up()                 override;
+    void next()               override;
+    void seek(int searchKey)  override;
 
-    int  key()   const override;
-    bool atEnd() const override;
+    int  key()          const override;
+    bool atEnd()        const override;
+    bool atValidDepth() const override;
 
   private:
-    const int mFst;
-    const int mSnd;
+    const int mFst; // The position of the 1st column in the global ordering.
+    const int mSnd; // The position of the 2nd column in the global ordering.
 
-    BTrie * const mDummy;
+    BTrie * const mDummy; // A dummy node used for storing the leaf node "at
+                          // depth -1".
 
-    std::stack<std::pair<page_id, int>> mHistory;
+    // A history of leaf pages the iterator has been through to get to the node
+    // at its current depth. For each page, we store the offset in that page,
+    // and the depth of the node.
+    std::stack<std::tuple<page_id, int, int>> mHistory;
 
-    int     mCurrDepth;
-    int     mNodeDepth;
+    int mCurrDepth; // The actual depth of the iterator
+    int mNodeDepth; // The last depth the iterator participated in.
+
+    // Cursor state.
     page_id mPID;
     BTrie * mCurr;
     int     mPos;
-
-    /**
-     * (private) BTrieIterator::atValidDepth
-     *
-     * @return true iff The table backing this iterator has a column at the at
-     *         the depth the iterator is currently at. (i.e. If the iterator
-     *         should participate in a join at this depth).
-     */
-    bool atValidDepth() const;
   };
 }
 
