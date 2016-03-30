@@ -2,7 +2,6 @@
 
 #include <cstdlib>
 #include <fcntl.h>
-#include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -49,8 +48,16 @@ namespace DB {
         runLen++;
       }
 
-    if (runLen < num)
-      return INVALID_PAGE;
+    if (runLen < num) {
+      std::stringstream err;
+      err << "Could not allocate ";
+      if (num == 1)
+        err << "a page!";
+      else
+        err << num << " contiguous pages!";
+
+      throw std::runtime_error(err.str());
+    }
 
     // set the pages in the run as allocated
     for (page_id i = pid0; i < pid0 + runLen; ++i)
