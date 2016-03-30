@@ -11,7 +11,7 @@ namespace DB {
     : mFst       ( fst )
     , mSnd       ( snd )
     , mDummy     ( (BTrie *) BTrie::onHeap(2, 1) )
-    , mPath      {}
+    , mHistory   {}
     , mCurrDepth ( -1 )
     , mNodeDepth ( -1 )
     , mPID       ( INVALID_PAGE )
@@ -37,7 +37,7 @@ namespace DB {
       return;
 
     // Save position at current level
-    mPath.emplace(mNodeDepth, std::make_pair(mPID, mPos));
+    mHistory.emplace(std::make_pair(mPID, mPos));
 
     // Find the leftmost child
     int cid = mCurr->slot(mPos)[1];
@@ -64,15 +64,13 @@ namespace DB {
     if (!atValidDepth() || mCurrDepth == mNodeDepth)
       return;
 
-    auto it = mPath.find(mCurrDepth);
-    if (it == mPath.end()) return;
-
+    // Recover old position from history and swap it in.
     if (mPID != INVALID_PAGE)
       Global::BUFMGR->unpin(mPID);
 
     mNodeDepth = mCurrDepth;
 
-    auto past = std::get<1>(*it);
+    auto past = mHistory.top();
     mPID = std::get<0>(past);
     mPos = std::get<1>(past);
 
@@ -80,7 +78,7 @@ namespace DB {
       ? mDummy
       : BTrie::load(mPID);
 
-    mPath.erase(it);
+    mHistory.pop();
   }
 
   void
@@ -100,6 +98,30 @@ namespace DB {
       mPID  = nid;
       mCurr = BTrie::load(mPID);
     }
+  }
+
+  void
+  BTrieIterator::seek(int searchKey)
+  {
+    if (!atValidDepth() || mCurrDepth < 0 || atEnd()) return;
+
+    searchKey   = std::max(searchKey, key());
+
+    auto past   = mHistory.top();
+    page_id pid = std::get<0>(past);
+    int     pos = std::get<1>(past);
+
+    page_id rootPID;
+    if (pid == INVALID_PAGE) {
+      rootPID = mDummy->slot(pos)[1];
+    } else {
+      rootPID = BTrie::load(pid)->slot(pos)[1];
+      Global::BUFMGR->unpin(pid);
+    }
+
+    Global::BUFMGR->unpin(mPID);
+    BTrie::find(rootPID, searchKey, mPID, mPos);
+    mCurr = BTrie::load(mPID);
   }
 
   int

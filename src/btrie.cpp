@@ -508,6 +508,33 @@ namespace DB {
     return diff;
   }
 
+  void
+  BTrie::find(page_id nid, int key, page_id &foundPID, int &foundPos)
+  {
+    BTrie * node = load(nid);
+    int     pos  = node->findKey(key);
+
+    switch (node->type) {
+    case Leaf:
+      if (pos >= node->count &&
+          node->next != INVALID_PAGE) {
+        foundPID = node->next;
+        foundPos = 0;
+      } else {
+        foundPID = nid;
+        foundPos = pos;
+      }
+      Global::BUFMGR->unpin(nid);
+      break;
+    case Branch: {
+      int childPID = node->slot(pos)[-1];
+      Global::BUFMGR->unpin(nid);
+      find(childPID, key, foundPID, foundPos);
+      break;
+    }
+    }
+  }
+
   int
   BTrie::findKey(int key)
   {

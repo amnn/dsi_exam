@@ -10,6 +10,13 @@ namespace DB {
    */
   struct TrieIterator {
     /**
+     * TrieIterator::~TrieIterator
+     *
+     * Default (empty) virtual destructor.
+     */
+    virtual ~TrieIterator() = default;
+
+    /**
      * TrieIterator::open
      *
      * Increase the depth of the iterator.
@@ -29,6 +36,16 @@ namespace DB {
      * Move the iterator one key forward at its current level.
      */
     virtual void next() = 0;
+
+    /**
+     * TrieIterator::seek
+     *
+     * Move the iterator forward to the first key whose value is greater than or
+     * equal to the one given.
+     *
+     * @param key The given key.
+     */
+    virtual void seek(int key) = 0;
 
     /**
      * TrieIterator::key

@@ -178,6 +178,21 @@ namespace DB {
                          std::function<bool(page_id, int)> predicate);
 
     /**
+     * BTrie::find
+     *
+     * Find the leaf node in the tree containing the smallest key greater than
+     * the given key.
+     *
+     * @param nid The page ID of root node of the BTrie to search in.
+     * @param key The search key.
+     * @param &foundPID The reference that will be set to the page_id of the
+     *                  leaf.
+     * @param &foundPos The reference that will be set to the position in the
+     *                  leaf to find the key at.
+     */
+    static void find(page_id nid, int key, page_id &foundPID, int &foundPos);
+
+    /**
      * BTrie::findKey
      *
      * @param key The key to search for.

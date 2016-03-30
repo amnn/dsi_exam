@@ -1,7 +1,7 @@
 #ifndef DB_BTRIE_ITERATOR_H
 #define DB_BTRIE_ITERATOR_H
 
-#include <map>
+#include <stack>
 #include <utility>
 
 #include "allocator.h"
@@ -31,7 +31,7 @@ namespace DB {
      *
      * Destructor.
      */
-    ~BTrieIterator();
+    ~BTrieIterator() override;
 
     /** Deleted Copy Constructors */
     BTrieIterator(const BTrieIterator &) = delete;
@@ -39,9 +39,10 @@ namespace DB {
 
     /** TrieIterator method overrides */
 
-    void open() override;
-    void up()   override;
-    void next() override;
+    void open()              override;
+    void up()                override;
+    void next()              override;
+    void seek(int searchKey) override;
 
     int  key()   const override;
     bool atEnd() const override;
@@ -52,7 +53,7 @@ namespace DB {
 
     BTrie * const mDummy;
 
-    std::map<int, std::pair<page_id, int>> mPath;
+    std::stack<std::pair<page_id, int>> mHistory;
 
     int     mCurrDepth;
     int     mNodeDepth;
