@@ -1,3 +1,6 @@
+#ifndef DB_TABLE_H
+#define DB_TABLE_H
+
 #include <cstddef>
 
 #include <memory>
@@ -67,7 +70,7 @@ namespace DB {
      * table. The iterator moves in only one direction, and its behaviour is
      * undefined if the table is modified whilst it is in use.
      */
-    std::unique_ptr<TrieIterator> scan();
+    TrieIterator::Ptr scan();
 
     /**
      * Table::singleton
@@ -80,7 +83,7 @@ namespace DB {
      * @return An iterator containing just the record [x, y] as if it originated from
      * an iterator for this table.
      */
-    std::unique_ptr<TrieIterator> singleton(int x, int y);
+    TrieIterator::Ptr singleton(int x, int y);
 
   private:
 
@@ -90,3 +93,5 @@ namespace DB {
     bool    mIsReversed;
   };
 }
+
+#endif // DB_TABLE_H
