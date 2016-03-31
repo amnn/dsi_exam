@@ -88,6 +88,9 @@ namespace DB {
     if (!atValidDepth())
       return std::numeric_limits<int>::min();
 
+    if (atEnd())
+      return std::numeric_limits<int>::max();
+
     return mKey;
   }
 
@@ -132,6 +135,7 @@ namespace DB {
     mActiveIters  = std::move(newActive);
     mDormantIters = std::move(newDormant);
 
+    // Sort Active iterators by their current key value.
     std::sort(mActiveIters.begin(),
               mActiveIters.end(),
               [](const auto &it1, const auto &it2) {
@@ -140,6 +144,7 @@ namespace DB {
 
     mNextIter = 0;
 
+    // Populate mKey with the next matching variable.
     search();
   }
 
@@ -154,9 +159,11 @@ namespace DB {
       auto &iter  = mActiveIters[mNextIter];
       int nextKey = iter->key();
       if (nextKey == maxKey) {
+        // All the iterators are at the same key, we have found a match.
         mKey = nextKey;
         return;
       } else {
+        // Catch up to the biggest key.
         iter->seek(maxKey);
         if (iter->atEnd()) {
           mAtEnd = true;

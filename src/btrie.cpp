@@ -65,6 +65,7 @@ namespace DB {
 
     return buf;
   }
+
   BTrie *
   BTrie::load(page_id nid)
   {
@@ -212,6 +213,7 @@ namespace DB {
       }
 
       node = load(nid);
+      // The child redistributed, we just need to update the partitioning key.
       if (childSplit.prop == PROP_REDISTRIB) {
         if (childSplit.sib == RIGHT_SIB)
           node->slot(pos)[0] = childSplit.key;
@@ -222,6 +224,8 @@ namespace DB {
         break;
       }
 
+      // The child was split, we'll need to insert a new slot. (We might need to
+      // split ourselves).
       if (node->isFull()) {
         int pivot;
         split = node->split(nid, pivot);
@@ -235,7 +239,7 @@ namespace DB {
       }
 
       node->makeRoom(pos);
-      *node->slot(pos) = childSplit.key;
+      node->slot(pos)[0] = childSplit.key;
       node->slot(pos)[1] = childSplit.pid;
       Global::BUFMGR->unpin(nid, true);
 

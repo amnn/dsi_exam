@@ -51,6 +51,8 @@ namespace DB {
       mFirstPID = nid;
     }
 
+    // Leave the last page around, but set its count to 0, as it is now our new
+    // first page.
     mLastPage->count = 0;
   }
 
