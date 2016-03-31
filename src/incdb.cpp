@@ -6,7 +6,7 @@
 #include "bufmgr.h"
 #include "db.h"
 #include "dim.h"
-#include "naive_equijoin.h"
+#include "naive_count.h"
 #include "table.h"
 
 using namespace std;
@@ -33,7 +33,7 @@ main(int, char **)
     R2->loadFromFile("data/R2.txt");
     R4->loadFromFile("data/R4.txt");
 
-    DB::NaiveEquiJoin join(4, {R1, R2, R4});
+    DB::NaiveCount join(4, {R1, R2, R4});
     join.recompute();
 
   } catch(exception &e) {

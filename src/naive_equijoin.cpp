@@ -1,9 +1,7 @@
 #include "naive_equijoin.h"
 
-#include <chrono>
 #include <iostream>
 
-#include "dim.h"
 #include "leapfrog_triejoin.h"
 #include "trie_iterator.h"
 
