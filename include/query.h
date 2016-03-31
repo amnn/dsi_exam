@@ -1,6 +1,9 @@
 #ifndef DB_QUERY_H
 #define DB_QUERY_H
 
+#include <unordered_map>
+#include <memory>
+
 #include "table.h"
 
 namespace DB {
@@ -17,7 +20,7 @@ namespace DB {
      *
      * Alias for a sequence of tables.
      */
-    using Tables = std::vector<std::shared_ptr<Table>>;
+    using Tables = std::unordered_map<int, std::shared_ptr<Table>>;
 
     /**
      * Query::Op
@@ -57,7 +60,7 @@ namespace DB {
      * @param op   The operation to perform.
      * @param x    The value of the first column of the record.
      * @param y    The value of the second column of the record.
-     * @return The time in milliseconds required to update the view.
+     * @return The time in nanoseconds required to update the view.
      */
     long update(int table, Op op, int x, int y);
 
@@ -75,9 +78,7 @@ namespace DB {
      * Update the view to reflect the fact the change to the input
      * table. Concrete sub-classes must implement this.
      *
-     * @param table The index of the table to update. This number is 1-indexed,
-     *              and refers to the order in which tables were given to the
-     *              query when it was constructed.
+     * @param table The name of the table to update.
      * @param op The operation to perform.
      * @param x The value of the first column of the record.
      * @param y The value of the second column of the record.

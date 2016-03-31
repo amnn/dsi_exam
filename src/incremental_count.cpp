@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <memory>
+#include <tuple>
 #include <vector>
 
 #include "leapfrog_triejoin.h"
@@ -15,13 +16,14 @@ namespace DB {
     mCount = 0;
 
     // Get fresh iterators.
-    std::vector<std::unique_ptr<TrieIterator>> iters;
-    for (const auto &tbl : getTables())
+    std::vector<TrieIterator::Ptr> iters;
+    for (const auto &kvp : getTables()) {
+      const auto &tbl = std::get<1>(kvp);
       iters.emplace_back(tbl->scan());
+    }
 
-    // Build a Join from them.
+    // Build a Join from them, and count the records in it.
     TrieIterator::Ptr query(new LeapFrogTrieJoin(getWidth(), move(iters)));
-
     TrieIterator::countingScan(query, mCount, getWidth());
 
 #ifdef DEBUG
@@ -40,12 +42,13 @@ namespace DB {
     }
 
     // Get fresh iterators.
-    int i = 1;
     std::vector<TrieIterator::Ptr> iters;
-    for (const auto &tbl : getTables()) {
+    for (const auto &kvp : getTables()) {
+      auto k          = std::get<0>(kvp);
+      const auto &tbl = std::get<1>(kvp);
+
       // NB. Iterator for table that changed is a singleton.
-      iters.emplace_back(i == table ? tbl->singleton(x, y) : tbl->scan());
-      i++;
+      iters.emplace_back(table == k ? tbl->singleton(x, y) : tbl->scan());
     }
 
     // Build a Join from them.

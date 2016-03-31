@@ -10,6 +10,7 @@
 #include "leapfrog_triejoin.h"
 #include "naive_count.h"
 #include "table.h"
+#include "test_bed.h"
 #include "trie_iterator.h"
 
 using namespace std;
@@ -27,22 +28,22 @@ main(int, char **)
     DB::Global::ALLOC  = &a;
     DB::Global::BUFMGR = &b;
 
-    auto
-      R1 = make_shared<DB::Table>(0, 1),
-      R2 = make_shared<DB::Table>(0, 2),
-      R4 = make_shared<DB::Table>(0, 3);
+    DB::Query::Tables R {
+      {1, make_shared<DB::Table>(0, 1)},
+      {2, make_shared<DB::Table>(0, 2)},
+      {4, make_shared<DB::Table>(0, 3)}
+    };
 
-    R1->loadFromFile("data/R1.txt");
-    R2->loadFromFile("data/R2.txt");
-    R4->loadFromFile("data/R4.txt");
+    R[1]->loadFromFile("data/R1.txt");
+    R[2]->loadFromFile("data/R2.txt");
+    R[4]->loadFromFile("data/R4.txt");
 
-    DB::IncrementalCount join(4, {R1, R2, R4});
+    DB::NaiveCount query(4, R);
+    query.recompute();
 
-    join.recompute();
-    join.update(1, DB::Query::Insert, 1, 42);
-    join.update(1, DB::Query::Insert, 1, 42);
-    join.update(1, DB::Query::Delete, 1, 42);
-    join.update(1, DB::Query::Delete, 1, 42);
+    DB::TestBed tb(query);
+    long time = tb.runFile(DB::Query::Insert, "data/I2.txt");
+    cout << time << " ns elapsed." << endl;
 
   } catch(exception &e) {
     cerr << "\n\nIncDB terminated due to exception: "

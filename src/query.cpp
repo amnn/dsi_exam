@@ -11,19 +11,25 @@ namespace DB {
   long
   Query::update(int table, Op op, int x, int y)
   {
-    // Update the input tables.
-    // NB `table` index starts from 1.
     bool didChange;
-    switch (op) {
-    case Query::Insert:
-      didChange = mTables[table - 1]->insert(x, y);
-      break;
-    case Query::Delete:
-      didChange = mTables[table - 1]->remove(x, y);
-      break;
+
+    auto it = mTables.find(table);
+    if (it == mTables.end()) {
+      // The table isn't actually part of this join, we're going to ignore it.
+      didChange = false;
+    } else {
+      switch (op) {
+      case Query::Insert:
+        didChange = mTables[table]->insert(x, y);
+        break;
+      case Query::Delete:
+        didChange = mTables[table]->remove(x, y);
+        break;
+      }
     }
 
-    using ms    = std::chrono::milliseconds;
+
+    using ns    = std::chrono::nanoseconds;
     using clock = std::chrono::steady_clock;
     auto begin  = clock::now();
 
@@ -31,7 +37,7 @@ namespace DB {
     updateView(table, op, x, y, didChange);
 
     // Calculate Time taken.
-    return std::chrono::duration_cast<ms>(clock::now() - begin).count();
+    return std::chrono::duration_cast<ns>(clock::now() - begin).count();
   }
 
   const Query::Tables &

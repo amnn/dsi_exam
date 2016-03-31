@@ -13,9 +13,11 @@ namespace DB {
     mResult.clear();
 
     // Get fresh iterators.
-    std::vector<std::unique_ptr<TrieIterator>> iters;
-    for (const auto &tbl : getTables())
+    std::vector<TrieIterator::Ptr> iters;
+    for (const auto &kvp : getTables()) {
+      const auto &tbl = std::get<1>(kvp);
       iters.emplace_back(tbl->scan());
+    }
 
     // Build a Join query from them.
     TrieIterator::Ptr query(new LeapFrogTrieJoin(getWidth(), move(iters)));
