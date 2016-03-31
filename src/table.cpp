@@ -1,6 +1,7 @@
 #include "table.h"
 
 #include <cstring>
+#include <fstream>
 #include <utility>
 #include <stdexcept>
 
@@ -19,6 +20,16 @@ namespace DB {
     , mSubOrder   { std::max(order1, order2) }
     , mIsReversed { order1 > order2 }
   {}
+
+  void
+  Table::loadFromFile(const char *fname)
+  {
+    std::ifstream file(fname);
+
+    int x, y; char c;
+    while ((file >> x >> c >> y) && c == ',')
+      insert(x, y);
+  }
 
   bool
   Table::insert(int x, int y)

@@ -28,6 +28,17 @@ namespace DB {
     Table(int order1, int order2);
 
     /**
+     * Table::loadFromFile
+     *
+     * Insert data into the table from a file. The file should be
+     * reaad-accessible to the database, and the format should be CSV with one
+     * record (two columns) per line.
+     *
+     * @param fname The name of the file to load from
+     */
+    void loadFromFile(const char *fname);
+
+    /**
      * Table::insert
      *
      * Insert a record into the table.
