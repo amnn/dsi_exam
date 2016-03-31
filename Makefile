@@ -2,6 +2,7 @@ CC=g++-5
 STD=c++14
 CCFLAGS=-Wall -Werror
 LDFLAGS=
+DEFINES=
 OPT=
 CMD=$(CC) --std=$(STD) $(OPT) -Iinclude
 
@@ -16,4 +17,10 @@ $(EXE): $(OBJ)
 	$(CMD) $(LDFLAGS) $(OBJ) -o $(EXE)
 
 obj/%.o: src/%.cpp $(INC)
-	$(CMD) $(CCFLAGS) -c $< -o $@
+	$(CMD) $(CCFLAGS) $(DEFINES) -c $< -o $@
+
+clean:
+	rm -f bin/*
+	rm -f obj/*
+
+.PHONY: clean
