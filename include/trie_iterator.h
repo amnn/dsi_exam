@@ -1,6 +1,8 @@
 #ifndef DB_TRIE_ITERATOR_H
 #define DB_TRIE_ITERATOR_H
 
+#include <memory>
+
 namespace DB {
   /**
    * TrieIterator
@@ -9,6 +11,14 @@ namespace DB {
    * level.
    */
   struct TrieIterator {
+    /**
+     * TrieIterator::Ptr
+     *
+     * Type alias for pointers to Trie Iterators, as this is generally how they
+     * are passed around.
+     */
+    using Ptr = std::unique_ptr<TrieIterator>;
+
     /**
      * TrieIterator::~TrieIterator
      *

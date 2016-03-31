@@ -30,7 +30,7 @@ namespace DB {
      *              every parameter that appears in the join, at least one of
      *              the iterators has a column at that position.
      */
-    LeapFrogTrieJoin(int joinSize, std::vector<std::unique_ptr<TrieIterator>> &&iters);
+    LeapFrogTrieJoin(int joinSize, std::vector<TrieIterator::Ptr> &&iters);
 
     /** Deleted Copy Constructors */
     LeapFrogTrieJoin(const LeapFrogTrieJoin &) = delete;
@@ -54,8 +54,8 @@ namespace DB {
     int  mKey;
     bool mAtEnd;
 
-    std::vector<std::unique_ptr<TrieIterator>> mActiveIters;
-    std::vector<std::unique_ptr<TrieIterator>> mDormantIters;
+    std::vector<TrieIterator::Ptr> mActiveIters;
+    std::vector<TrieIterator::Ptr> mDormantIters;
 
     /**
      * (private) LeapFrogTrieJoin::init();

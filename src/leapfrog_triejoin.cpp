@@ -6,7 +6,7 @@
 
 namespace DB {
   LeapFrogTrieJoin::LeapFrogTrieJoin(int joinSize,
-                                     std::vector<std::unique_ptr<TrieIterator>> &&iters)
+                                     std::vector<TrieIterator::Ptr> &&iters)
     : mJoinSize     ( joinSize )
     , mDepth        ( -1 )
     , mNextIter     ( 0 )
@@ -109,7 +109,7 @@ namespace DB {
   void
   LeapFrogTrieJoin::init()
   {
-    std::vector<std::unique_ptr<TrieIterator>>
+    std::vector<TrieIterator::Ptr>
       newActive {}, newDormant {};
 
     mAtEnd = false;

@@ -144,19 +144,19 @@ namespace DB {
     return didChange;
   }
 
-  std::unique_ptr<TrieIterator>
+  TrieIterator::Ptr
   Table::scan()
   {
     BTrieIterator *it = new BTrieIterator(mRootPID, mRootOrder, mSubOrder);
-    return std::unique_ptr<TrieIterator>(it);
+    return TrieIterator::Ptr(it);
   }
 
-  std::unique_ptr<TrieIterator>
+  TrieIterator::Ptr
   Table::singleton(int x, int y)
   {
     if (mIsReversed) std::swap(x, y);
 
     SingletonIterator *it = new SingletonIterator(mRootOrder, x, mSubOrder, y);
-    return std::unique_ptr<TrieIterator>(it);
+    return TrieIterator::Ptr(it);
   }
 }
