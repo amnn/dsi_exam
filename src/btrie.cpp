@@ -142,20 +142,19 @@ namespace DB {
 
             int total = node->count + right->count + 1;
             int delta = total / 2 - right->count;
-            int keep  = node->count - delta;
 
-            if (pos > keep) {
+            if (pos > node->count - delta) {
               delta--;
-              pos -= keep + 1;
+              pos -= node->count - delta;
               pid  = node->next;
             }
 
             right->makeRoom(0, delta);
-            memmove(right->slot(0), node->slot(keep),
+            memmove(right->slot(0), node->slot(node->count - delta),
                     delta * node->l.stride * sizeof(int));
-            node->count = keep;
+            node->count -= delta;
 
-            split.key = pid == nid && pos == keep
+            split.key = pid == nid && pos == node->count
               ? key
               : node->slot(node->count - 1)[0];
 
@@ -291,12 +290,11 @@ namespace DB {
 
           int total = node->count + left->count;
           int delta = (total - 1) / 2 - node->count + 1;
-          int keep  = left->count - delta;
 
           node->makeRoom(0, delta);
-          memmove(node->slot(0), left->slot(keep),
+          memmove(node->slot(0), left->slot(left->count - delta),
                   delta * node->l.stride * sizeof(int));
-          left->count = keep;
+          left->count -= delta;
 
           diff.key = left->slot(left->count - 1)[0];
 
@@ -431,14 +429,13 @@ namespace DB {
 
           int total = node->count + left->count;
           int delta = (total - 1)/ 2 - node->count + 1;
-          int keep  = left->count - delta;
 
           node->makeRoom(0, delta);
           node->slot(delta - 1)[0] = family.leftKey;
           node->slot(delta - 1)[1] = node->slot(0)[-1];
-          memmove(node->slot(0) - 1, left->slot(keep) + 1,
+          memmove(node->slot(0) - 1, left->slot(left->count - delta) + 1,
                   (delta * BRANCH_STRIDE - 1) * sizeof(int));
-          left->count = keep;
+          left->count -= delta;
 
           diff.key = left->slot(left->count)[0];
 
