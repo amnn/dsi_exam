@@ -12,13 +12,14 @@ namespace DB {
   Query::update(int table, Op op, int x, int y)
   {
     // Update the input tables.
+    // NB `table` index starts from 1.
     bool didChange;
     switch (op) {
     case Query::Insert:
-      didChange = mTables[table]->insert(x, y);
+      didChange = mTables[table - 1]->insert(x, y);
       break;
     case Query::Delete:
-      didChange = mTables[table]->remove(x, y);
+      didChange = mTables[table - 1]->remove(x, y);
       break;
     }
 

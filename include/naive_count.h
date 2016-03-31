@@ -35,16 +35,6 @@ namespace DB {
 
   private:
     int mCount;
-
-    /**
-     * (private) NaiveCount::scanCount
-     *
-     * Count the number of records in the iterator by scanning through it.
-     *
-     * @param it     The iterator to scan through.
-     * @param depth  The depth to start filling from (defaults to 0).
-     */
-    void scanCount(TrieIterator::Ptr &it, int depth = 0);
   };
 }
 

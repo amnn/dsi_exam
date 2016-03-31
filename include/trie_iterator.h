@@ -20,6 +20,19 @@ namespace DB {
     using Ptr = std::unique_ptr<TrieIterator>;
 
     /**
+     * TrieIterator::countingScan
+     *
+     * Count the number of records in the iterator by scanning through it.
+     *
+     * @param it A pointer to the iterator
+     * @param &count A reference to an accumulator that is bumped for every
+     *               record in the iterator.
+     * @param depth How deep the current iterator is. (How many times can it be
+     *              opened)
+     */
+    static void countingScan(Ptr &it, int &count, int depth);
+
+    /**
      * TrieIterator::~TrieIterator
      *
      * Default (empty) virtual destructor.

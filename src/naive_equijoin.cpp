@@ -18,8 +18,7 @@ namespace DB {
       iters.emplace_back(tbl->scan());
 
     // Build a Join query from them.
-    std::unique_ptr<TrieIterator>
-      query(new LeapFrogTrieJoin(getWidth(), move(iters)));
+    TrieIterator::Ptr query(new LeapFrogTrieJoin(getWidth(), move(iters)));
 
     // Pour it out into a result file.
     int *recBuf = new int[getWidth()]();

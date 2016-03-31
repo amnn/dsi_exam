@@ -6,8 +6,11 @@
 #include "bufmgr.h"
 #include "db.h"
 #include "dim.h"
+#include "incremental_count.h"
+#include "leapfrog_triejoin.h"
 #include "naive_count.h"
 #include "table.h"
+#include "trie_iterator.h"
 
 using namespace std;
 
@@ -33,8 +36,13 @@ main(int, char **)
     R2->loadFromFile("data/R2.txt");
     R4->loadFromFile("data/R4.txt");
 
-    DB::NaiveCount join(4, {R1, R2, R4});
+    DB::IncrementalCount join(4, {R1, R2, R4});
+
     join.recompute();
+    join.update(1, DB::Query::Insert, 1, 42);
+    join.update(1, DB::Query::Insert, 1, 42);
+    join.update(1, DB::Query::Delete, 1, 42);
+    join.update(1, DB::Query::Delete, 1, 42);
 
   } catch(exception &e) {
     cerr << "\n\nIncDB terminated due to exception: "
