@@ -47,7 +47,7 @@ main(int, char **)
 
     DB::TestBed tb(query);
     long time = tb.runFile(DB::Query::Delete, "data/D4.txt");
-    cout << time << " ns elapsed." << endl;
+    cout << time << " us elapsed." << endl;
 
   } catch(exception &e) {
     cerr << "\n\nIncDB terminated due to exception: "

@@ -28,7 +28,7 @@ namespace DB {
       }
     }
 
-    using ns    = std::chrono::nanoseconds;
+    using us    = std::chrono::microseconds;
     using clock = std::chrono::steady_clock;
     auto begin  = clock::now();
 
@@ -36,7 +36,7 @@ namespace DB {
     updateView(table, op, x, y, didChange);
 
     // Calculate Time taken.
-    return std::chrono::duration_cast<ns>(clock::now() - begin).count();
+    return std::chrono::duration_cast<us>(clock::now() - begin).count();
   }
 
   const Query::Tables &
