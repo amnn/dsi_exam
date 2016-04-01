@@ -41,7 +41,8 @@ namespace DB {
     const int mY;
 
     int mDepth;
-    int mAtEnd = false;
+    bool mFstAtEnd;
+    bool mSndAtEnd;
 
   };
 }

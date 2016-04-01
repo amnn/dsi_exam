@@ -5,45 +5,49 @@
 
 namespace DB {
   SingletonIterator::SingletonIterator(int fst, int x, int snd, int y)
-    : mFst   ( fst )
-    , mX     ( x )
-    , mSnd   ( snd )
-    , mY     ( y )
-    , mDepth ( -1 )
-    , mAtEnd ( false )
+    : mFst      ( fst )
+    , mX        ( x )
+    , mSnd      ( snd )
+    , mY        ( y )
+    , mDepth    ( -1 )
+    , mFstAtEnd ( false )
+    , mSndAtEnd ( false )
   {}
 
   void
   SingletonIterator::open()
   {
-    if (mAtEnd)
+    if (atEnd())
       throw std::runtime_error("open: iterator finished!");
 
     mDepth++;
-
-    if (atValidDepth()) mAtEnd = false;
   }
 
-  void SingletonIterator::up()   { mDepth--; }
+  void SingletonIterator::up()   {
+    mDepth--;
+
+    mFstAtEnd &= (mDepth >= mFst);
+    mSndAtEnd &= (mDepth >= mSnd);
+  }
 
   void
   SingletonIterator::next()
   {
-    if (atValidDepth()) mAtEnd = true;
+    mFstAtEnd |= (mDepth == mFst);
+    mSndAtEnd |= (mDepth == mSnd);
   }
 
   void
   SingletonIterator::seek(int searchKey)
   {
-    mAtEnd |=
-      (mDepth == mFst && searchKey > mX) ||
-      (mDepth == mSnd && searchKey > mY);
+    mFstAtEnd |= mDepth == mFst && searchKey > mX;
+    mSndAtEnd |= mDepth == mSnd && searchKey > mY;
   }
 
   int
   SingletonIterator::key() const
   {
-    if (mAtEnd)
+    if (atEnd())
       return std::numeric_limits<int>::max();
 
     if (mDepth == mFst)
@@ -54,7 +58,13 @@ namespace DB {
     return std::numeric_limits<int>::min();
   }
 
-  bool SingletonIterator::atEnd() const { return mAtEnd; }
+  bool
+  SingletonIterator::atEnd() const
+  {
+    return
+      (mDepth == mFst && mFstAtEnd) ||
+      (mDepth == mSnd && mSndAtEnd);
+  }
 
   bool
   SingletonIterator::atValidDepth() const

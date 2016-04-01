@@ -15,6 +15,10 @@
 
 using namespace std;
 
+void scanByLine(DB::TrieIterator::Ptr &it,
+                int depth, int *rec,
+                int stride, int &count);
+
 int
 main(int, char **)
 {
@@ -38,11 +42,11 @@ main(int, char **)
     R[2]->loadFromFile("data/R2.txt");
     R[4]->loadFromFile("data/R4.txt");
 
-    DB::NaiveCount query(4, R);
+    DB::IncrementalCount query(4, R);
     query.recompute();
 
     DB::TestBed tb(query);
-    long time = tb.runFile(DB::Query::Insert, "data/I2.txt");
+    long time = tb.runFile(DB::Query::Delete, "data/D4.txt");
     cout << time << " ns elapsed." << endl;
 
   } catch(exception &e) {
@@ -50,4 +54,26 @@ main(int, char **)
          << e.what() << endl;
   }
   return 0;
+}
+
+void
+scanByLine(DB::TrieIterator::Ptr &it,
+           int depth, int *rec,
+           int stride, int &count)
+{
+  if (depth >= stride) {
+    for (int i = 0; i < stride; ++i)
+      cout << rec[i] << " ";
+    cout << endl;
+    count++;
+    return;
+  }
+
+  it->open();
+  while (!it->atEnd()) {
+    rec[depth] = it->key();
+    scanByLine(it, depth + 1, rec, stride, count);
+    it->next();
+  }
+  it->up();
 }

@@ -28,7 +28,6 @@ namespace DB {
       }
     }
 
-
     using ns    = std::chrono::nanoseconds;
     using clock = std::chrono::steady_clock;
     auto begin  = clock::now();
