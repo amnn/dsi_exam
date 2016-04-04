@@ -15,7 +15,9 @@ namespace DB {
    * BTrie
    *
    * Implementation of the Nested BTrie Index (specialised to always hold
-   * records with two columns).
+   * records with two columns). In this implementation, all nodes perform
+   * redistribution after deletions, but only leaf nodes perform redistributions
+   * after insertions.
    */
   struct BTrie {
     /**

@@ -10,15 +10,17 @@ namespace DB {
   /**
    * NodeType
    *
-   * Enum to tag BTrie Nodes with their type (Leaf or Branch)
+   * Enum to tag Trie Nodes with their type (Leaf or Branch)
    */
   enum NodeType { Branch, Leaf };
 
   /**
    * Siblings
    *
-   * Enum used to tell a child node which of its neighbours are siblings. This
-   * information is used when redistributing.
+   * Enum used when a child node needs to know which of its neighbours are
+   * siblings, for example, when redistributing or merging. Elements of this
+   * enum can be combined using the `|` operator (for instance, if both
+   * neighbours are also siblings).
    */
   enum Siblings : unsigned int {
     NO_SIBS   = 0,
@@ -29,7 +31,7 @@ namespace DB {
   /**
    * Family
    *
-   * Information about sibling nodes, used for redistributions.
+   * Information about sibling nodes, used for redistributions and merged.
    */
   struct Family {
     Siblings sibs;
