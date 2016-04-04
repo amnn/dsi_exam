@@ -538,22 +538,6 @@ namespace DB {
     }
   }
 
-  int
-  BTrie::findKey(int key)
-  {
-    int lo = 0, hi = count;
-
-    while(lo < hi) {
-      int m = lo + (hi - lo) / 2;
-      int k = slot(m)[0];
-
-      if      (key <= k) hi = m;
-      else if (key >  k) lo = m + 1;
-    }
-
-    return lo;
-  }
-
   BTrie::Diff
   BTrie::split(page_id pid, int &pivot)
   {
@@ -635,19 +619,6 @@ namespace DB {
     }
   }
 
-  void
-  BTrie::makeRoom(int index, int size)
-  {
-    int stride = type == Leaf
-      ? l.stride
-      : BRANCH_STRIDE;
-
-    memmove(slot(index + size), slot(index),
-            (count - index) * stride * sizeof(int));
-
-    count += size;
-  }
-
   NodeType
   BTrie::getType() const
   {
@@ -715,5 +686,34 @@ namespace DB {
     default:
       throw std::runtime_error("Unrecognised Node Type");
     }
+  }
+
+  int
+  BTrie::findKey(int key)
+  {
+    int lo = 0, hi = count;
+
+    while(lo < hi) {
+      int m = lo + (hi - lo) / 2;
+      int k = slot(m)[0];
+
+      if      (key <= k) hi = m;
+      else if (key >  k) lo = m + 1;
+    }
+
+    return lo;
+  }
+
+  void
+  BTrie::makeRoom(int index, int size)
+  {
+    int stride = type == Leaf
+      ? l.stride
+      : BRANCH_STRIDE;
+
+    memmove(slot(index + size), slot(index),
+            (count - index) * stride * sizeof(int));
+
+    count += size;
   }
 }

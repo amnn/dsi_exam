@@ -152,15 +152,6 @@ namespace DB {
     static void find(page_id nid, int key, page_id &foundPID, int &foundPos);
 
     /**
-     * BTrie::findKey
-     *
-     * @param key The key to search for.
-     * @return The index of the slot in the node corresponding to the smallest
-     *         key greater than or equal to the one provided.
-     */
-    int findKey(int key);
-
-    /**
      * BTrie::split
      *
      * Split the data in this node across two nodes.
@@ -278,6 +269,15 @@ namespace DB {
         int data[1];
       } l;
     };
+
+    /**
+     * (private) BTrie::findKey
+     *
+     * @param key The key to search for.
+     * @return The index of the slot in the node corresponding to the smallest
+     *         key greater than or equal to the one provided.
+     */
+    int findKey(int key);
 
     /**
      * (private) BTrie::makeRoom
