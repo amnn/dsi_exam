@@ -30,6 +30,10 @@ namespace DB {
      */
     Table(int order1, int order2);
 
+    /** Deleted copy constructors */
+    Table(const Table &) = delete;
+    Table & operator = (const Table &) = delete;
+
     /**
      * Table::loadFromFile
      *
