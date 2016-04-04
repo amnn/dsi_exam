@@ -51,7 +51,7 @@ namespace DB {
     mPos  = 0;
     mPID  = cid;
     mCurr = BTrie::load(mPID);
-    while (mCurr->getType() != BTrie::Leaf) {
+    while (mCurr->getType() != Leaf) {
       cid   = mCurr->slot(0)[-1];
       Global::BUFMGR->unpin(mPID);
       mPID  = cid;

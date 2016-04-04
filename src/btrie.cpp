@@ -6,8 +6,10 @@
 namespace DB {
 
   const int BTrie::BRANCH_STRIDE = 2;
-  const int BTrie::BRANCH_SPACE  = (Dim::PAGE_SIZE - offsetof(BTrie, b.data)) / sizeof(int);
-  const int BTrie::LEAF_SPACE    = (Dim::PAGE_SIZE - offsetof(BTrie, l.data)) / sizeof(int);
+  const int BTrie::BRANCH_SPACE  =
+    (Dim::PAGE_SIZE - offsetof(BTrie, b.data)) / sizeof(int);
+  const int BTrie::LEAF_SPACE    =
+    (Dim::PAGE_SIZE - offsetof(BTrie, l.data)) / sizeof(int);
 
   page_id
   BTrie::leaf(int stride)
@@ -646,7 +648,7 @@ namespace DB {
     count += size;
   }
 
-  BTrie::NodeType
+  NodeType
   BTrie::getType() const
   {
     return type;
@@ -713,26 +715,5 @@ namespace DB {
     default:
       throw std::runtime_error("Unrecognised Node Type");
     }
-  }
-
-  BTrie::Siblings
-  operator|(BTrie::Siblings s, BTrie::Siblings t)
-  {
-    using UL = std::underlying_type<BTrie::Siblings>::type;
-    return BTrie::Siblings(static_cast<UL>(s) | static_cast<UL>(t));
-  }
-
-  BTrie::Siblings
-  operator&(BTrie::Siblings s, BTrie::Siblings t)
-  {
-    using UL = std::underlying_type<BTrie::Siblings>::type;
-    return BTrie::Siblings(static_cast<UL>(s) & static_cast<UL>(t));
-  }
-
-  BTrie::Siblings &
-  operator|=(BTrie::Siblings &s, BTrie::Siblings t)
-  {
-    s = s | t;
-    return s;
   }
 }
