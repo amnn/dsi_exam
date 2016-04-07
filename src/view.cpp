@@ -36,7 +36,7 @@ namespace DB {
     auto txn  = (FTrie::Transaction *)&txns[1];
 
     txn->message = msg;
-    memmove(txn->data, data, mWidth);
+    memmove(txn->data, data, mWidth * sizeof(int));
 
     auto diff = FTrie::flush(mRootPID, {.sibs = NO_SIBS}, txns);
     delete[] txns;
@@ -48,8 +48,9 @@ namespace DB {
       mTrie    = FTrie::load(mRootPID);
 
       delete diff.newSlots;
-    } else if (mTrie->isEmpty() &&
-               mTrie->getType() == Branch) {
+    } else if (mTrie->isEmpty()            &&
+               mTrie->getType()  == Branch &&
+               mTrie->txns(0)[0] == 0) {
 
       page_id newRoot = mTrie->slot(0)[-1];
 

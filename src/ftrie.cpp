@@ -235,18 +235,22 @@ namespace DB {
         }
 
         // Flush it
+        std::cout << "Intermediate node flushing" << std::endl;
         page_id subPID = node->slot(pos)[1];
         auto childDiff = flush(subPID, {.sibs = NO_SIBS}, childTxns);
         delete[] childTxns;
+        std::cout << "Intermediate node flushed" << std::endl;
 
         // Deal with the Diff
         if (childDiff.prop == PROP_SPLIT) {
+          std::cout << "Dealing with a split sub" << std::endl;
           node->slot(pos)[1] =
-            FTrie::branch(W, node->slot(pos)[1],
+            FTrie::branch(W-1, node->slot(pos)[1],
                           *childDiff.newSlots);
 
           delete childDiff.newSlots;
         } else {
+          std::cout << "Checking for emptiness" << std::endl;
           // Check whether the child is empty.
           FTrie *sub = load(subPID);
           if (sub->isEmpty()) {
@@ -259,7 +263,13 @@ namespace DB {
               break;
 
             case Branch:
-              // Replave the branch with its only child.
+              // We cannot collapse if there are waiting transactions.
+              if (sub->txns(0)[0] > 0) {
+                Global::BUFMGR->unpin(subPID);
+                break;
+              }
+
+              // Replace the branch with its only child.
               node->slot(pos)[1] = sub->slot(0)[-1];
 
               Global::BUFMGR->unpin(subPID);
@@ -337,12 +347,15 @@ namespace DB {
           std::cout << "Returned from the child" << std::endl;
           // Deal with the diff.
           if (childDiff.prop == PROP_SPLIT) {
+            std::cout << "Dealing with the child split" << std::endl;
             auto it = childDiff.newSlots->begin();
 
             while (it != childDiff.newSlots->end()) {
               int     slotKey = std::get<0>(*it);
               page_id slotPID = std::get<1>(*it);
+              std::cout << "Seeking key" << std::endl;
               seekKey(slotKey);
+              std::cout << "Seeked key" << std::endl;
 
               if (node->isFull()) {
                 // We must split the node
@@ -364,11 +377,18 @@ namespace DB {
           } else if(childDiff.prop == PROP_MERGE) {
             if (childDiff.sib == RIGHT_SIB) {
               int toFree = node->slot(pos)[+1];
+              std::cout << "RM Freeing " << toFree << std::endl;
 
               node->makeRoom(pos + 1, -1);
               Global::BUFMGR->bfree(toFree);
             } else if (childDiff.sib == LEFT_SIB) {
               int toFree = node->slot(pos)[-1];
+              std::cout << "LM Freeing " << toFree << " " << pos << std::endl;
+
+              // Adopt the transaction buffer from the sibling, before it gets
+              // deleted.
+              memmove(node->txns(pos), node->txns(pos - 1),
+                      node->txnSpacePerChild() * sizeof(int));
 
               node->makeRoom(pos, -1);
               Global::BUFMGR->bfree(toFree);
@@ -393,7 +413,9 @@ namespace DB {
 
     if (!node->isUnderOccupied()) {
       std::cout << "No change" << std::endl;
+      std::cout << "Unpinning current node" << std::endl;
       Global::BUFMGR->unpin(pid, true);
+      std::cout << "Unpinned current node" << std::endl;
       return diff;
     }
 
@@ -412,7 +434,10 @@ namespace DB {
         left->merge(lid, node, family.leftKey);
 
         Global::BUFMGR->unpin(lid, true);
-        Global::BUFMGR->unpin(nid);
+        Global::BUFMGR->unpin(pid);
+
+        debugPrint(lid);
+        std::cout << "****************************************" << std::endl;
         return diff;
       }
     }
@@ -431,8 +456,11 @@ namespace DB {
 
         node->merge(pid, right, family.rightKey);
 
-        Global::BUFMGR->unpin(nid, true);
+        Global::BUFMGR->unpin(pid, true);
         Global::BUFMGR->unpin(rid);
+
+        debugPrint(pid);
+        std::cout << "****************************************" << std::endl;
         return diff;
       }
     }
@@ -440,7 +468,7 @@ namespace DB {
     std::cout << "I'm under occupied and can't do anything about it"
               << std::endl;
 
-    Global::BUFMGR->unpin(nid, true);
+    Global::BUFMGR->unpin(pid, true);
     return diff;
   }
 
@@ -598,21 +626,33 @@ namespace DB {
       memmove(slot(count), that->slot(0),
               that->count * stride() * sizeof(int));
 
-      memmove(txns(count + that->count - 1),
-              txns(that->count - 1),
-              that->count * txnSpacePerChild() * sizeof(int));
-
       count += that->count;
       break;
     case Branch:
+      std::cout << "Merge This " << count << std::endl;
+      for (int i = 0; i <= count; ++i) {
+        debugPrintTxns(txns(i), txnSize(), width);
+      }
+
+      std::cout << "Merge That " << that->count << std::endl;
+      for (int i = 0; i <= that->count; ++i) {
+        debugPrintTxns(that->txns(i), txnSize(), width);
+      }
+
       slot(count)[0] = part;
       memmove(slot(count) + 1, that->slot(0) - 1,
               (1 + that->count * stride()) * sizeof(int));
 
       memmove(txns(count + that->count + 1),
-              txns(that->count),
+              that->txns(that->count),
               (that->count + 1) * txnSpacePerChild() * sizeof(int));
+
       count += that->count + 1;
+
+      std::cout << "Merge Result" << std::endl;
+      for (int i = 0; i <= count; ++i) {
+        debugPrintTxns(txns(i), txnSize(), width);
+      }
       break;
     }
 
@@ -642,7 +682,7 @@ namespace DB {
   int *
   FTrie::txns(int index)
   {
-    int *end = data + SPACE;
+    int *end = &data[0] + SPACE;
     return end - txnSpacePerChild() * (index + 1);
   }
 
@@ -682,15 +722,11 @@ namespace DB {
   FTrie::findTxn(int *txns, int txnSize, int from, int key)
   {
     int lo = from, hi = txns[0];
-    std::cout << "Searching " << lo <<":"<< hi << "in ";
-    debugPrintTxns(txns, txnSize, txnSize - 1);
 
     while(lo < hi) {
       int  m   = lo + (hi - lo) / 2;
       auto txn = (Transaction *)&txns[txnSize * m + 1];
       int  k   = txn->data[0];
-
-      std::cout << k << "@" << m << std::endl;
 
       if (key > k) lo = m + 1;
       else         hi = m;
@@ -765,13 +801,16 @@ namespace DB {
     memmove(slot(index + size), slot(index),
             (count - index) * stride() * sizeof(int));
 
-    // Move transactions
-    int end = type == Leaf
-      ? count - 1
-      : count;
+    if (type == Branch) {
+      // Move transactions
+      memmove(txns(count + size), txns(count),
+              (count - index + 1) * txnSpacePerChild() * sizeof(int));
 
-    memmove(txns(end + size), txns(end),
-            (end - index + 1) * txnSpacePerChild() * sizeof(int));
+      // Initialise counts of new transaction buffers.
+      for (int i = index; i < index + size; ++i) {
+        txns(i)[0] = 0;
+      }
+    }
 
     count += size;
   }
