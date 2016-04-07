@@ -286,10 +286,13 @@ namespace DB {
         // Find all the transactions being sent to this child.
         int u;
         if (pos == node->count) {
+          std::cout << "At the last node" << std::endl;
           u = TC;
         } else {
           int pivot = node->slot(pos)[0];
+          std::cout << "Looking for <= " << pivot + 1 << std::endl;
           u = findTxn(txns, TS, t, pivot + 1);
+          std::cout << "Found at " << u << std::endl;
         }
 
         std::cout << "Sending: " << t << " to " << u << std::endl;
@@ -679,10 +682,15 @@ namespace DB {
   FTrie::findTxn(int *txns, int txnSize, int from, int key)
   {
     int lo = from, hi = txns[0];
+    std::cout << "Searching " << lo <<":"<< hi << "in ";
+    debugPrintTxns(txns, txnSize, txnSize - 1);
 
     while(lo < hi) {
-      int m = lo + (hi - lo) / 2;
-      int k = txns[txnSize * m + 1];
+      int  m   = lo + (hi - lo) / 2;
+      auto txn = (Transaction *)&txns[txnSize * m + 1];
+      int  k   = txn->data[0];
+
+      std::cout << k << "@" << m << std::endl;
 
       if (key > k) lo = m + 1;
       else         hi = m;
