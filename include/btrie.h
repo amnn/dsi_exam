@@ -174,9 +174,7 @@ namespace DB {
      * enough space for the data from both nodes.
      *
      * @param nid  The page_id of this node.
-     *
      * @param that The node to merge into this one.
-     *
      * @param part The key that partitions these two nodes (When merging
      *             branches this needs to be added back in).
      */

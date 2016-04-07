@@ -12,6 +12,7 @@
 #include "table.h"
 #include "test_bed.h"
 #include "trie_iterator.h"
+#include "view.h"
 
 using namespace std;
 
@@ -32,6 +33,7 @@ main(int, char **)
     DB::Global::ALLOC  = &a;
     DB::Global::BUFMGR = &b;
 
+    /*
     DB::Query::Tables R {
       {1, make_shared<DB::Table>(0, 1)},
       {2, make_shared<DB::Table>(0, 2)},
@@ -48,6 +50,20 @@ main(int, char **)
     DB::TestBed tb(query);
     long time = tb.runFile(DB::Query::Delete, "data/D4.txt");
     cout << time << " us elapsed." << endl;
+    */
+
+    DB::View v(1);
+
+    for (int i = 1; i <= 56; ++i)
+      v.insert(&i);
+
+    for (;;) {
+      char c; int x;
+      cin >> c >> x;
+      if      (c == '+') v.insert(&x);
+      else if (c == '-') v.remove(&x);
+      else if (c == '!') break;
+    }
 
   } catch(exception &e) {
     cerr << "\n\nIncDB terminated due to exception: "

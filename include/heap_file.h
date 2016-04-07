@@ -11,7 +11,8 @@ namespace DB {
    * HeapFile
    *
    * Stores data sequentially. The interface is "write-only" and is used by the
-   * NaiveDB incremental maintenance algorithm to simulate materialising the join.
+   * NaiveDB incremental maintenance algorithm to simulate materialising the
+   * join.
    */
   struct HeapFile {
     /**
