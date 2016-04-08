@@ -20,7 +20,7 @@ obj/%.o: src/%.cpp $(INC)
 	$(CMD) $(CCFLAGS) $(DEFINES) -c $< -o $@
 
 clean:
-	rm -f bin/*
-	rm -f obj/*
+	rm -rf bin/*
+	rm -rf obj/*
 
 .PHONY: clean
