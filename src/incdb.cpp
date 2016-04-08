@@ -20,6 +20,7 @@ int
 main(int, char **)
 {
   try {
+    // Initialise Database
     DB::Allocator a(DB::Dim::NAME,
                     DB::Dim::PAGE_SIZE,
                     DB::Dim::NUM_PAGES);
@@ -29,17 +30,22 @@ main(int, char **)
     DB::Global::ALLOC  = &a;
     DB::Global::BUFMGR = &b;
 
+    // Create Tables
     DB::Query::Tables R {
       {1, make_shared<DB::Table>(0, 1)},
-      {2, make_shared<DB::Table>(0, 2)}
+      {2, make_shared<DB::Table>(0, 2)},
+      {4, make_shared<DB::Table>(0, 3)},
     };
 
     R[1]->loadFromFile("data/R1.txt");
     R[2]->loadFromFile("data/R2.txt");
+    R[4]->loadFromFile("data/R4.txt");
 
+    // Create Query
     DB::IncrementalEquiJoin query(3, R);
     query.recompute();
 
+    // Run Transactions
     DB::TestBed tb(query);
     long time = tb.runFile(DB::Query::Delete, "data/D5.txt");
     cout << time << " us elapsed." << endl;
