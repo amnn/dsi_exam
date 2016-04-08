@@ -60,7 +60,5 @@ namespace DB {
       mRootPID = newRoot;
       mTrie    = FTrie::load(mRootPID);
     }
-
-    FTrie::debugPrint(mRootPID);
   }
 }

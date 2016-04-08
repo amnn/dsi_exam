@@ -116,8 +116,6 @@ namespace DB {
     const int   W   = node->width;      // Record Width
     const auto  NT  = node->type;       // Node Type
 
-    std::cout << "txns: "; debugPrintTxns(txns, TS, W);
-
     // Set up a place for splits to be recorded.
     const NewSlots newNbrs = new std::vector< BranchSlot >();
 
@@ -147,14 +145,11 @@ namespace DB {
     switch (NT) {
     case Leaf:
       if (W == 1) {
-        std::cout << "Bottom" << std::endl;
         // We are at the very bottom of the tree, we must apply all the
         // transactions.
         while (t < TC) {
           auto txn = (Transaction *)&txns[TS * t + 1];
           int  key = txn->data[0];
-
-          std::cout << "Key: " << key << std::endl;
           seekKey(key);
 
           switch (txn->message) {
@@ -166,7 +161,6 @@ namespace DB {
 
             if (node->isFull()) {
               // We must split and try again.
-              std::cout << "SPLIT" << std::endl;
               int partKey;
               page_id newNbr = node->split(pid, partKey);
               newNbrs->emplace(std::next(newNbrs->begin(), nbr),
@@ -196,7 +190,6 @@ namespace DB {
       }
 
       // We are at an intermediary leaf
-      std::cout << "Leaf" << std::endl;
       while (t < TC) {
         auto txn = (Transaction *)&txns[TS * t + 1];
         int  key = txn->data[0];
@@ -241,14 +234,12 @@ namespace DB {
 
         // Deal with the Diff
         if (childDiff.prop == PROP_SPLIT) {
-          std::cout << "child split" << std::endl;
           node->slot(pos)[1] =
             FTrie::branch(W-1, node->slot(pos)[1],
                           *childDiff.newSlots);
 
           delete childDiff.newSlots;
         } else {
-          std::cout << "child empty?" << std::endl;
           // Check whether the child is empty.
           FTrie *sub = load(subPID);
           if (sub->isEmpty()) {
@@ -282,12 +273,9 @@ namespace DB {
       }
       break;
     case Branch:
-      std::cout << "Branch" << std::endl;
       while (t < TC) {
         auto txn = (Transaction *)&txns[TS * t + 1];
         int  key = txn->data[0];
-        std::cout << "Key: " << key << std::endl;
-
         seekKey(key);
 
         // Find all the transactions being sent to this child.
@@ -310,7 +298,6 @@ namespace DB {
 
           delete[] mergedTxns;
         } else {
-          std::cout << "child flush" << std::endl;
           // If not, flush all the transactions to the child.
           Family childFamily {.sibs = NO_SIBS};
           if (pos > 0) {
@@ -329,7 +316,6 @@ namespace DB {
 
           // Deal with the diff.
           if (childDiff.prop == PROP_SPLIT) {
-            std::cout << "child split" << std::endl;
             auto it = childDiff.newSlots->begin();
 
             while (it != childDiff.newSlots->end()) {
@@ -339,7 +325,6 @@ namespace DB {
 
               if (node->isFull()) {
                 // We must split the node
-                std::cout << "SPLIT" << std::endl;
                 int partKey;
                 page_id newNbr = node->split(pid, partKey);
                 newNbrs->emplace(std::next(newNbrs->begin(), nbr),
@@ -590,16 +575,6 @@ namespace DB {
       count += that->count;
       break;
     case Branch:
-      std::cout << "Merge This " << count << std::endl;
-      for (int i = 0; i <= count; ++i) {
-        debugPrintTxns(txns(i), txnSize(), width);
-      }
-
-      std::cout << "Merge That " << that->count << std::endl;
-      for (int i = 0; i <= that->count; ++i) {
-        debugPrintTxns(that->txns(i), txnSize(), width);
-      }
-
       slot(count)[0] = part;
       memmove(slot(count) + 1, that->slot(0) - 1,
               (1 + that->count * stride()) * sizeof(int));
@@ -609,11 +584,6 @@ namespace DB {
               (that->count + 1) * txnSpacePerChild() * sizeof(int));
 
       count += that->count + 1;
-
-      std::cout << "Merge Result" << std::endl;
-      for (int i = 0; i <= count; ++i) {
-        debugPrintTxns(txns(i), txnSize(), width);
-      }
       break;
     }
 
