@@ -17,4 +17,22 @@ namespace DB {
     it->up();
   }
 
+  void
+  TrieIterator::traverse(Ptr &it, int depth, int *rec,
+                         std::function<void(void)> act,
+                         int pos)
+  {
+    if (pos >= depth) {
+      act();
+      return;
+    }
+
+    it->open();
+    while (!it->atEnd()) {
+      rec[pos] = it->key();
+      traverse(it, depth, rec, act, pos + 1);
+      it->next();
+    }
+    it->up();
+  }
 }

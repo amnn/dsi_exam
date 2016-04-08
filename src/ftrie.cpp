@@ -147,7 +147,7 @@ namespace DB {
     switch (NT) {
     case Leaf:
       if (W == 1) {
-        std::cout << "We are at the very bottom" << std::endl;
+        std::cout << "Bottom" << std::endl;
         // We are at the very bottom of the tree, we must apply all the
         // transactions.
         while (t < TC) {
@@ -166,7 +166,7 @@ namespace DB {
 
             if (node->isFull()) {
               // We must split and try again.
-              std::cout << "Splitting at the bottom"  << std::endl;
+              std::cout << "SPLIT" << std::endl;
               int partKey;
               page_id newNbr = node->split(pid, partKey);
               newNbrs->emplace(std::next(newNbrs->begin(), nbr),
@@ -196,7 +196,7 @@ namespace DB {
       }
 
       // We are at an intermediary leaf
-      std::cout << "We are at an intermediary leaf" << std::endl;
+      std::cout << "Leaf" << std::endl;
       while (t < TC) {
         auto txn = (Transaction *)&txns[TS * t + 1];
         int  key = txn->data[0];
@@ -231,26 +231,24 @@ namespace DB {
           auto toTxn   = (Transaction *)&childTxns[(i - t) * (TS - 1) + 1];
 
           toTxn->message = fromTxn->message;
-          memmove(toTxn->data, fromTxn->data + 1, (TS - 1) * sizeof(int));
+          memmove(toTxn->data, fromTxn->data + 1, (W - 1) * sizeof(int));
         }
 
         // Flush it
-        std::cout << "Intermediate node flushing" << std::endl;
         page_id subPID = node->slot(pos)[1];
         auto childDiff = flush(subPID, {.sibs = NO_SIBS}, childTxns);
         delete[] childTxns;
-        std::cout << "Intermediate node flushed" << std::endl;
 
         // Deal with the Diff
         if (childDiff.prop == PROP_SPLIT) {
-          std::cout << "Dealing with a split sub" << std::endl;
+          std::cout << "child split" << std::endl;
           node->slot(pos)[1] =
             FTrie::branch(W-1, node->slot(pos)[1],
                           *childDiff.newSlots);
 
           delete childDiff.newSlots;
         } else {
-          std::cout << "Checking for emptiness" << std::endl;
+          std::cout << "child empty?" << std::endl;
           // Check whether the child is empty.
           FTrie *sub = load(subPID);
           if (sub->isEmpty()) {
@@ -266,14 +264,13 @@ namespace DB {
               // We cannot collapse if there are waiting transactions.
               if (sub->txns(0)[0] > 0) {
                 Global::BUFMGR->unpin(subPID);
-                break;
+              } else {
+                // Replace the branch with its only child.
+                node->slot(pos)[1] = sub->slot(0)[-1];
+
+                Global::BUFMGR->unpin(subPID);
+                Global::BUFMGR->bfree(subPID);
               }
-
-              // Replace the branch with its only child.
-              node->slot(pos)[1] = sub->slot(0)[-1];
-
-              Global::BUFMGR->unpin(subPID);
-              Global::BUFMGR->bfree(subPID);
               break;
             }
           } else {
@@ -285,7 +282,7 @@ namespace DB {
       }
       break;
     case Branch:
-      std::cout << "At a Branch" << std::endl;
+      std::cout << "Branch" << std::endl;
       while (t < TC) {
         auto txn = (Transaction *)&txns[TS * t + 1];
         int  key = txn->data[0];
@@ -296,39 +293,24 @@ namespace DB {
         // Find all the transactions being sent to this child.
         int u;
         if (pos == node->count) {
-          std::cout << "At the last node" << std::endl;
           u = TC;
         } else {
           int pivot = node->slot(pos)[0];
-          std::cout << "Looking for <= " << pivot + 1 << std::endl;
           u = findTxn(txns, TS, t, pivot + 1);
-          std::cout << "Found at " << u << std::endl;
         }
-
-        std::cout << "Sending: " << t << " to " << u << std::endl;
-        std::cout << "Existing "; debugPrintTxns(node->txns(pos), TS, W);
 
         // Merge the new and existing transactions.
         int *mergedTxns =
           mergeTxns(node->txns(pos), &txns[TS * t + 1], u - t, W);
 
-        std::cout << "Merged: "; debugPrintTxns(mergedTxns, TS, W);
-
         // Just put them back into the buffer, if we can.
         if (mergedTxns[0] <= node->txnsPerChild()) {
-          std::cout << "Shifting " << mergedTxns[0]
-                    << "/" << node->txnsPerChild()
-                    << " txns into " << pos << " "
-                    << (1 + mergedTxns[0] * node->txnSize()) * sizeof(int)
-                    << "/" << node->txnSpacePerChild() * sizeof(int)
-                    << std::endl;
-
           memmove(node->txns(pos), mergedTxns,
                   (1 + mergedTxns[0] * node->txnSize()) * sizeof(int));
 
           delete[] mergedTxns;
         } else {
-          std::cout << "NEED TO FLUSH CHILD" << std::endl;
+          std::cout << "child flush" << std::endl;
           // If not, flush all the transactions to the child.
           Family childFamily {.sibs = NO_SIBS};
           if (pos > 0) {
@@ -344,22 +326,20 @@ namespace DB {
           auto childDiff = flush(node->slot(pos)[-1], childFamily, mergedTxns);
           node->txns(pos)[0] = 0; // We have flushed them.
           delete[] mergedTxns;
-          std::cout << "Returned from the child" << std::endl;
+
           // Deal with the diff.
           if (childDiff.prop == PROP_SPLIT) {
-            std::cout << "Dealing with the child split" << std::endl;
+            std::cout << "child split" << std::endl;
             auto it = childDiff.newSlots->begin();
 
             while (it != childDiff.newSlots->end()) {
               int     slotKey = std::get<0>(*it);
               page_id slotPID = std::get<1>(*it);
-              std::cout << "Seeking key" << std::endl;
               seekKey(slotKey);
-              std::cout << "Seeked key" << std::endl;
 
               if (node->isFull()) {
                 // We must split the node
-                std::cout << "Splitting in branch" << std::endl;
+                std::cout << "SPLIT" << std::endl;
                 int partKey;
                 page_id newNbr = node->split(pid, partKey);
                 newNbrs->emplace(std::next(newNbrs->begin(), nbr),
@@ -377,13 +357,11 @@ namespace DB {
           } else if(childDiff.prop == PROP_MERGE) {
             if (childDiff.sib == RIGHT_SIB) {
               int toFree = node->slot(pos)[+1];
-              std::cout << "RM Freeing " << toFree << std::endl;
 
               node->makeRoom(pos + 1, -1);
               Global::BUFMGR->bfree(toFree);
             } else if (childDiff.sib == LEFT_SIB) {
               int toFree = node->slot(pos)[-1];
-              std::cout << "LM Freeing " << toFree << " " << pos << std::endl;
 
               // Adopt the transaction buffer from the sibling, before it gets
               // deleted.
@@ -402,7 +380,6 @@ namespace DB {
     }
 
     if (!newNbrs->empty()) {
-      std::cout << "Splitting" << std::endl;
       diff.prop = PROP_SPLIT;
       diff.newSlots = newNbrs;
       Global::BUFMGR->unpin(pid, true);
@@ -412,22 +389,17 @@ namespace DB {
     }
 
     if (!node->isUnderOccupied()) {
-      std::cout << "No change" << std::endl;
-      std::cout << "Unpinning current node" << std::endl;
       Global::BUFMGR->unpin(pid, true);
-      std::cout << "Unpinned current node" << std::endl;
       return diff;
     }
 
     if (family.sibs & LEFT_SIB) {
-      std::cout << "Left merge?" << std::endl;
       page_id lid = node->prev;
       FTrie *left = load(lid);
 
       if (!left->isUnderOccupied()) {
         Global::BUFMGR->unpin(lid);
       } else {
-        std::cout << "Left merge!" << std::endl;
         diff.prop = PROP_MERGE;
         diff.sib  = LEFT_SIB;
 
@@ -435,22 +407,17 @@ namespace DB {
 
         Global::BUFMGR->unpin(lid, true);
         Global::BUFMGR->unpin(pid);
-
-        debugPrint(lid);
-        std::cout << "****************************************" << std::endl;
         return diff;
       }
     }
 
     if (family.sibs & RIGHT_SIB) {
-      std::cout << "Right merge?" << std::endl;
       page_id rid  = node->next;
       FTrie *right = load(rid);
 
       if (!right->isUnderOccupied()) {
         Global::BUFMGR->unpin(rid);
       } else {
-        std::cout << "Right merge!" << std::endl;
         diff.prop = PROP_MERGE;
         diff.sib  = RIGHT_SIB;
 
@@ -458,15 +425,9 @@ namespace DB {
 
         Global::BUFMGR->unpin(pid, true);
         Global::BUFMGR->unpin(rid);
-
-        debugPrint(pid);
-        std::cout << "****************************************" << std::endl;
         return diff;
       }
     }
-
-    std::cout << "I'm under occupied and can't do anything about it"
-              << std::endl;
 
     Global::BUFMGR->unpin(pid, true);
     return diff;

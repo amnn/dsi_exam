@@ -1,6 +1,7 @@
 #ifndef DB_TRIE_ITERATOR_H
 #define DB_TRIE_ITERATOR_H
 
+#include <functional>
 #include <memory>
 
 namespace DB {
@@ -31,6 +32,26 @@ namespace DB {
      *              opened)
      */
     static void countingScan(Ptr &it, int &count, int depth);
+
+    /**
+     * TrieIterator::traverse
+     *
+     * Consume the entire iterator, calling the provided function for each
+     * record encountered. Each time the function is called, the provided buffer
+     * will have been filled with the contents of the next record.
+     *
+     * @param it A pointer to the iterator
+     * @param depth How deep the current iterator is. (How many times can it be
+     *              opened)
+     * @param rec A buffer for storing records (must be big enough to fit the
+     *            records in).
+     * @param act The operation to perform at each record.
+     * @param pos The position (current depth) of the iterator. This is intended
+     *            to be set by recursive calls to the function.
+     */
+    static void traverse(Ptr &it, int depth, int * rec,
+                         std::function<void(void)> act,
+                         int pos = 0);
 
     /**
      * TrieIterator::~TrieIterator
