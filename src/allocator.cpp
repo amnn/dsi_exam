@@ -15,6 +15,9 @@ namespace DB {
     , mSpaceMap ( pcount, false )
     , mName     ( fname )
   {
+    // Remove the old version of the file, if it exists.
+    unlink(mName.c_str());
+
     // Open the file, and test for success.
     mFD = open(fname, O_RDWR | O_CREAT | O_EXCL, 0666);
     if (mFD < 0) {
@@ -31,7 +34,6 @@ namespace DB {
   Allocator::~Allocator()
   {
     close(mFD);
-    unlink(mName.c_str());
     mFD = -1;
   }
 

@@ -1,4 +1,4 @@
-CC=g++-5
+CC=g++
 STD=c++14
 CCFLAGS=-Wall -Werror
 LDFLAGS=

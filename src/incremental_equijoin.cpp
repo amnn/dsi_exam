@@ -17,7 +17,7 @@ namespace DB {
   void
   IncrementalEquiJoin::recompute()
   {
-    // Reset the counter
+    // Reset the table (doesn't actually do anything).
     mJoin.clear();
 
     // Get fresh iterators.
