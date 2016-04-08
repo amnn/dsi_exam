@@ -57,17 +57,29 @@ namespace DB {
     // Build a Join from them.
     TrieIterator::Ptr query(new LeapFrogTrieJoin(getWidth(), move(iters)));
 
+    int txnsLogged = 0; // Used only in Debug mode.
     int *rec = new int[getWidth()]();
-    TrieIterator::traverse(query, getWidth(), rec, [this, op, rec]() {
-        switch (op) {
-        case Insert:
-          mJoin.insert(rec);
-          break;
-        case Delete:
-          mJoin.remove(rec);
-          break;
-        }
-      });
+    TrieIterator::traverse(query, getWidth(), rec,
+                           [this, op, rec, &txnsLogged]() {
+
+#ifdef DEBUG
+                             if (txnsLogged++ / 100 == 0)
+                               std::cout << "." << std::flush;
+#endif
+
+                             switch (op) {
+                             case Insert:
+                               mJoin.insert(rec);
+                               break;
+                             case Delete:
+                               mJoin.remove(rec);
+                               break;
+                             }
+                           });
     delete[] rec;
+
+#ifdef DEBUG
+    std::cout << std::endl;
+#endif
   }
 }
