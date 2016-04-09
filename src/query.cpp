@@ -11,13 +11,10 @@ namespace DB {
   long
   Query::update(int table, Op op, int x, int y)
   {
-    bool didChange;
+    bool didChange = false;
 
     auto it = mTables.find(table);
-    if (it == mTables.end()) {
-      // The table isn't actually part of this join, we're going to ignore it.
-      didChange = false;
-    } else {
+    if (it != mTables.end()) {
       switch (op) {
       case Query::Insert:
         didChange = mTables[table]->insert(x, y);

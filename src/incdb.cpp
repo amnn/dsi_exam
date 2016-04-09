@@ -37,15 +37,16 @@ main(int, char **)
       {4, make_shared<DB::Table>(0, 3)},
     };
 
+    cout << "Loading Data..." << endl;
     R[1]->loadFromFile("data/R1.txt");
     R[2]->loadFromFile("data/R2.txt");
     R[4]->loadFromFile("data/R4.txt");
 
-    // Create Query
+    cout << "Initialising Query..." << endl;
     DB::IncrementalEquiJoin query(4, R);
     query.recompute();
 
-    // Run Transactions
+    cout << "Running Transactions..." << endl;
     DB::TestBed tb(query);
     long time = tb.runFile(DB::Query::Insert, "data/I5.txt");
     cout << time << " us elapsed." << endl;

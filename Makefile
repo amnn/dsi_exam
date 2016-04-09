@@ -3,7 +3,7 @@ STD=c++14
 CCFLAGS=-Wall -Werror
 LDFLAGS=
 DEFINES=
-OPT=
+OPT=-O2
 CMD=$(CC) --std=$(STD) $(OPT) -Iinclude
 
 INC=$(wildcard include/*.h)
