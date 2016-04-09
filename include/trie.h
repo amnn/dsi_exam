@@ -31,12 +31,12 @@ namespace DB {
   /**
    * Family
    *
-   * Information about sibling nodes, used for redistributions and merged.
+   * Information about sibling nodes, used for redistributions and merges.
    */
   struct Family {
     Siblings sibs;
-    int leftKey;
-    int rightKey;
+    int * leftKey;
+    int * rightKey;
   };
 
   /**

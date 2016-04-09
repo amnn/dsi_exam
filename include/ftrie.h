@@ -5,7 +5,6 @@
 #include "trie.h"
 
 #include <memory>
-#include <utility>
 #include <vector>
 
 namespace DB {
@@ -15,6 +14,10 @@ namespace DB {
    * Implementation of Nested Fractial Tries. Unlike the Nested B+ Trie
    * implementation, this one handles arbitrary depth, and relies solely upon
    * splitting and merging to maintain balance (no redistribution).
+   *
+   * Furthermore, rather than actually nesting indices in memory, this
+   * implementation is of a multi-key index (where entire records are stored as
+   * pivots/partitioning keys). This improves safe efficiency at larger depths.
    *
    * If the FTrie node has N bytes of space for data, then sqrt(N) of it will be
    * used for pointers to children, and the remaining space is used for
@@ -48,9 +51,8 @@ namespace DB {
       int data[1];
     };
 
-    /** Convenient type aliases to avoid a long type signature. */
-    using BranchSlot = std::pair<int, page_id>;
-    using NewSlots   = std::vector< BranchSlot > *;
+    /** Convenient type alias to avoid a long type signature. */
+    using NewSlots = std::vector<int> *;
 
     /**
      * FTrie::Diff
@@ -91,7 +93,7 @@ namespace DB {
      *         multiple layers of branches.
      */
     static page_id branch(int width, page_id leftPID,
-                          std::vector<BranchSlot> slots);
+                          std::vector<int> slots);
 
     /**
      * FTrie::load
@@ -145,19 +147,27 @@ namespace DB {
     static void debugPrintTxns(int *txns, int txnSize, int width);
 
     /**
+     * FTrie::debugPrintKey
+     *
+     * Format and print a key of the given length.
+     *
+     * @param key Pointer to the key.
+     * @param width Length of the key.
+     */
+    static void debugPrintKey(int *key, int width);
+
+    /**
      * FTrie::split
      *
-     * Allocate enough neighbouring nodes to the right of this one to fit all
-     * the contents of this node and the number of requisite new slots.
+     * Share the contents of this node between itself and a new neighbour to the
+     * right.
      *
      * @param pid The page ID of this node.
-     * @param &key Reference that is filled with the key that partitions the old
-     *             and new nodes.
-     * @return The page_ids and pivot keys (zero-initialised) of the new pages,
-     *         waiting to be filled with data.
-     *
+     * @param key Pointer that is filled with the key that partitions the old
+     *            and new nodes.
+     * @return The page_id of the new neighbour.
      */
-    page_id split(page_id pid, int &key);
+    page_id split(page_id pid, int *key);
 
     /**
      * FTrie::merge
@@ -169,10 +179,10 @@ namespace DB {
      *
      * @param nid  The page_id of this node.
      * @param that The node to merge into this one.
-     * @param part The key that partitions these two nodes (When merging
-     *             branches, this needs to be added back in).
+     * @param part Pointer to the key that partitions these two nodes (When
+     *             merging branches, this needs to be added back in).
      */
-    void merge(page_id nid, FTrie *that, int part);
+    void merge(page_id nid, FTrie *that, int *part);
 
     /**
      * FTrie::isEmpty
@@ -248,15 +258,27 @@ namespace DB {
     int      data[1];
 
     /**
+     * (private) FTrie::cmpKey
+     *
+     * Compare two keys using a lexicographic ordering.
+     *
+     * @param key1 Pointer to the first key.
+     * @param key2 Pointer to the second key.
+     * @param width Number of columns in a key.
+     * @return -1 if key1 < key, 0 if key1 = key2 and +1 if key1 > key2
+     */
+    static int cmpKey(int *key1, int *key2, int width);
+
+    /**
      * (private) FTrie::findKey
      *
-     * @param key The key to search for.
+     * @param key Pointer to the key to search for.
      * @param from An index to start the search from (inclusive). This defaults
      *             to 0, meaning all slots are searched.
      * @return The index of the slot in the node corresponding to the smallest
      *         key greater than or equal to the one provided.
      */
-    int findKey(int key, int from = 0);
+    int findKey(int *key, int from = 0);
 
     /**
      * (private) FTrie::findNewSlot
@@ -268,7 +290,7 @@ namespace DB {
      * @param key The key to search for.
      * @return The index into the slots vector where the search ended.
      */
-    static int findNewSlot(const NewSlots &slots, int key);
+    int findNewSlot(const NewSlots &slots, int *key);
 
     /**
      * (private) FTrie::findTxn
@@ -278,12 +300,12 @@ namespace DB {
      *
      * @param txns The buffer holding transactions (First index holds size of
      *             buffer).
-     * @param txnSize The size of each transaction in the buffer.
+     * @param width The size of a single record in the transaction.
      * @param from The index to start the search from (inclusive).
-     * @param key The search key.
+     * @param key Pointer to the search key.
      * @return The index into the transaction buffer where the search ended.
      */
-    static int findTxn(int *txns, int txnSize, int from, int key);
+    static int findTxn(int *txns, int width, int from, int *key);
 
     /**
      * (private) FTrie::mergeTxns
@@ -304,7 +326,8 @@ namespace DB {
      * @return A pointer to a new buffer containing the merge result, (and its
      *         size at position 0).
      */
-    static int *mergeTxns(int *existing, int *incoming, int incCount, int width);
+    static int *mergeTxns(int *existing, int *incoming, int incCount,
+                          int width);
 
     /**
      * (private) FTrie::makeRoom
@@ -354,7 +377,9 @@ namespace DB {
      */
     inline int stride() const
     {
-      return type == Leaf && width == 1 ? 1 : 2;
+      return type == Leaf
+        ? width
+        : width + 1;
     }
   };
 }

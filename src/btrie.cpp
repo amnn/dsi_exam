@@ -339,7 +339,7 @@ namespace DB {
         diff.prop = PROP_MERGE;
         diff.sib  = LEFT_SIB;
 
-        left->merge(lid, node, family.leftKey);
+        left->merge(lid, node, *family.leftKey);
 
         Global::BUFMGR->unpin(lid, true);
         Global::BUFMGR->unpin(nid);
@@ -353,7 +353,7 @@ namespace DB {
         diff.prop = PROP_MERGE;
         diff.sib  = RIGHT_SIB;
 
-        node->merge(nid, right, family.rightKey);
+        node->merge(nid, right, *family.rightKey);
 
         Global::BUFMGR->unpin(nid, true);
         Global::BUFMGR->unpin(rid);
@@ -368,21 +368,20 @@ namespace DB {
       Family childFamily {};
       if (pos > 0) {
         childFamily.sibs    |= LEFT_SIB;
-        childFamily.leftKey  = node->slot(pos - 1)[0];
+        childFamily.leftKey  = node->slot(pos - 1);
       }
 
       if (pos < node->count) {
         childFamily.sibs |= RIGHT_SIB;
-        childFamily.rightKey = node->slot(pos)[0];
+        childFamily.rightKey = node->slot(pos);
       }
-
-      Global::BUFMGR->unpin(nid);
 
       // Traverse the appropriate child.
       Diff childDiff = deleteIf(childPID, key, childFamily, predicate);
 
       // If we don't need to update this node, then return.
       if (childDiff.prop != PROP_MERGE && childDiff.prop != PROP_REDISTRIB) {
+        Global::BUFMGR->unpin(nid);
         diff = childDiff;
         break;
       } else {
@@ -390,7 +389,6 @@ namespace DB {
       }
 
       // Fix the partitioning key in the case of a redistribution.
-      node = load(nid);
       if (childDiff.prop == PROP_REDISTRIB) {
         if (childDiff.sib == RIGHT_SIB)
           node->slot(pos)[0] = childDiff.key;
@@ -433,7 +431,7 @@ namespace DB {
           int delta = (total - 1)/ 2 - node->count + 1;
 
           node->makeRoom(0, delta);
-          node->slot(delta - 1)[0] = family.leftKey;
+          node->slot(delta - 1)[0] = *family.leftKey;
           node->slot(delta - 1)[1] = node->slot(0)[-1];
           memmove(node->slot(0) - 1, left->slot(left->count - delta) + 1,
                   (delta * BRANCH_STRIDE - 1) * sizeof(int));
@@ -460,7 +458,7 @@ namespace DB {
           int total = node->count + right->count;
           int delta = (total - 1) / 2 - node->count + 1;
 
-          node->slot(node->count)[0] = family.rightKey;
+          node->slot(node->count)[0] = *family.rightKey;
           memmove(node->slot(node->count) + 1, right->slot(0) - 1,
                   (delta * BRANCH_STRIDE - 1) * sizeof(int));
           node->count += delta;
@@ -483,7 +481,7 @@ namespace DB {
         diff.prop   = PROP_MERGE;
         diff.sib    = LEFT_SIB;
 
-        left->merge(lid, node, family.leftKey);
+        left->merge(lid, node, *family.leftKey);
 
         Global::BUFMGR->unpin(lid, true);
         Global::BUFMGR->unpin(nid);
@@ -497,7 +495,7 @@ namespace DB {
         diff.prop    = PROP_MERGE;
         diff.sib     = RIGHT_SIB;
 
-        node->merge(nid, right, family.rightKey);
+        node->merge(nid, right, *family.rightKey);
         Global::BUFMGR->unpin(nid, true);
         Global::BUFMGR->unpin(rid);
         break;
