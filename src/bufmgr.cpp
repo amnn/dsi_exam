@@ -25,7 +25,7 @@ namespace DB {
     if (fid == INVALID_FRAME) {
       fid = mReplacer.pickVictim();
       if (fid == INVALID_FRAME)
-        return nullptr;
+        throw std::runtime_error("No Free Frames!");
     }
 
     Frame &frame = mFrames[fid];

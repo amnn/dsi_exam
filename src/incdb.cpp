@@ -42,12 +42,12 @@ main(int, char **)
     R[4]->loadFromFile("data/R4.txt");
 
     // Create Query
-    DB::IncrementalEquiJoin query(3, R);
+    DB::IncrementalEquiJoin query(4, R);
     query.recompute();
 
     // Run Transactions
     DB::TestBed tb(query);
-    long time = tb.runFile(DB::Query::Delete, "data/D5.txt");
+    long time = tb.runFile(DB::Query::Insert, "data/I5.txt");
     cout << time << " us elapsed." << endl;
 
   } catch(exception &e){

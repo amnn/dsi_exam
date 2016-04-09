@@ -82,7 +82,7 @@ namespace DB {
         spillOver.emplace_back(std::make_pair(partition, newBID));
 
         // replace bid with newBID
-        Global::BUFMGR->unpin(bid);
+        Global::BUFMGR->unpin(bid, true);
         bid    = newBID;
         branch = newBranch;
       } else {
@@ -92,6 +92,7 @@ namespace DB {
       }
     }
 
+    Global::BUFMGR->unpin(bid, true);
     return FTrie::branch(width, leftPID, spillOver);
   }
 
