@@ -10,9 +10,9 @@ namespace DB {
   namespace Dim {
     constexpr const char *NAME = "inc.db";
 
-    constexpr unsigned PAGE_SIZE = 1 << 10;
-    constexpr unsigned NUM_PAGES = 50000;
-    constexpr unsigned POOL_SIZE = 100;
+    constexpr unsigned PAGE_SIZE = 8 << 10;
+    constexpr unsigned NUM_PAGES = 300000;
+    constexpr unsigned POOL_SIZE = 1000;
   }
 }
 

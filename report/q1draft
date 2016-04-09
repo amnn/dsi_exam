@@ -1,0 +1,620 @@
+# Question 1
+
+This design is based on Leap Frog Trie Join (Veldhuizen 2013) and Fractal Tree
+Indices, as implemented by TokuDB. We differentiate from each of these by:
+
+* Combining the disparate techniques from each of these papers.
+* Adapting Leap Frog Trie Join for use in the incremental setting.
+* Adapting the same algorithm to count records without materialising them.
+* Improving the amortized time complexity and number of I/O's by taking
+advantage of access patterns.
+* Providing expositions of the conrete data structures used to implement Leap
+Frog Trie Join. This implementation is hinted at in the paper, but not
+explicitly given.
+
+# Part a
+
+The algorithm relies heavily on the fact that tables do not contains duplicate
+values. Suppose we insert `t` into `R1`, then we have two cases:
+
+## Case 1: t not in R1
+
+=> (R1 |><| R2) & ({t} |><| R2) = {}
+=> |(R1 U {t}) |><| R2| = |R1 |><| R2| + |{t} |><| R2|
+
+## Case 2 : t in R1
+
+=> {t} |><| R2 \subseteq R1 |><| R2
+=> |(R1 U {t}) |><| R2| = |R1 |><| R2|
+
+Similarly, if we remove `t` from `R2` we have two cases:
+
+## Case 1 : t in R1
+
+=> (R1\{t}) |><| R2 = (R1 |><| R2)\({t} |><| R2)
+=> { by the same disjointness condition in Case 1 above}
+|(R1\{t}) |><| R2| = |R1 |><| R2| - |{t} |><| R2|
+
+## Case 2 : t not in R1
+
+=> (R1\{t}) |><| R2 = R1 |><| R2
+=> |(R1\{t}) |><| R2| = |R1 |><| R2|
+
+From these results we see that (a) if the operation is redundant, then the query
+result does not need to be altered. (b) If the operation is not redundant, we
+may compute a much smaller join (as in the hint), and use that to update the
+query result. In the case of COUNT queries, this means we do not need to
+materialise the join, just keep a running total.
+
+The pseudo-code that follows will be written in terms of interfaces.
+
+## T : table
+
+### T.insert(r : record) : bool
+
+Insert r into T, if it does not already exist there. Returns true iff T changed
+as a result of the operation.
+
+### T.delete(r : record) : bool
+
+Remove r from T, returning true iff T changed as a result of the operation.
+
+### T.scan() : iterator
+
+Return an iterator by which we may scan through the records of T.
+
+## I : iterator
+
+### I.key() : int
+
+Return the index key of the record at the current position.
+
+### I.get() : record
+
+Return the record at the current position.
+
+### I.next()
+
+Move the iterators cursor one step forward.
+
+### I.seek(key : int)
+
+Move the iterator the to the first record after its current position with a key
+greater than or equal to to the one provided (or to the end if such a record
+does not exist).
+
+### I.atEnd() : bool
+
+Returns true iff the iterator's cursor has passed the last record.
+
+## V : view
+
+Views have a similar interface to tables, but do not return a boolean after an
+update, allowing them to apply updates lazily.
+
+### V.insert(r : record)
+
+### V.delete(r : record)
+
+## Part (a.i)
+
+W.l.o.g. Suppose we have a sequence (u_i)^n_{i=1}, all for R1, we simply serve
+them sequentially:
+
+    for i in [1..n] do
+      update(u_i)
+
+And we then serve each update as follows:
+
+### Equijoin query
+
+Suppose we have `V : view` holding the current result.
+
+    update(+R1(a, b)):
+      if not R1.insert(a, b) then
+        return
+
+      S2 <- R2.scan()
+      S2.seek(a)
+
+      while S2.key() == a && not S2.atEnd() do
+        (a', c) <- S2.get()
+        V.insert(a, b, c)
+        S2.next()
+
+    update(-R1(a, b)):
+      if not R1.delete(a, b) then
+        return
+
+      S2 <- R2.scan()
+      S2.seek(a)
+
+      while S2.key() == a && not S2.atEnd() do
+        (a', c) <- S2.get()
+        V.delete(a, b, c)
+        S2.next()
+
+### Count query
+
+Suppose we have `C : int` holding the current result.
+
+    update(+R1(a, b)):
+      if not R1.insert(a, b) then
+        return
+
+      S2 <- R2.scan()
+      S2.seek(a)
+
+      while S2.key() == a && not S2.atEnd() do
+        C <- C + 1
+        S2.next()
+
+    update(-R1(a, b)):
+      if not R1.delete(a, b) then
+        return
+
+      S2 <- R2.scan()
+      S2.seek(a)
+
+      while S2.key() == a && not S2.atEnd() do
+        C <- C - 1
+        S2.next()
+
+## Part (a.iv)
+
+Next, we focus on the data structures we will use to implement the algorithm, as
+precisely what they are will affect the example runs and the performance
+analysis.
+
+Our input tables will be stored in B+-trees keyed on A to make seeking elements
+fast.
+
+The materialised view will be stored in a Fractal Trie Index (Note, Trie, not
+Tree). Like a Fractal Tree Index, this structure is similar to a B+-tree, but at
+each internal node, some space is taken by a list of pending transactions. When
+an update is made to the structure, it is logged in the root node's transaction
+buffer.
+
+If a transaction buffer becomes full, some of its contents is flushed to a child
+(which contains all the records pertaining to those flushed transactions). Let
+us say, the child that would reduce the size of the buffer the most.
+
+At most one transaction can be held in a buffer for any one record, `r`. If two
+transactions `t1`, followed by `t2` are put into the same buffer, both
+pertaining to `r`, we merge them: If `t1 = t2` then keep only one, and otherwise
+keep neither. We can do this because we maintain an invariant that records are
+only inserted into the materialised view when they were not there before, and
+similarly only removed when they already exist in the view. (Really we only need
+to deal with the case where `t1 != t2` but the other case is added for
+completeness).
+
+When making point queries, we must check the transaction buffers of nodes we go
+through, and when making range queries, we must first flush all ancestors of
+leaf nodes we may touch, to make sure we have up-to-date data.
+
+We call this data structure a Trie Index as opposed to a Tree Index, because, it
+nests trees within trees. In this example, the join has 3 (unique) columns, A,
+B, and C, so the trie index at the root, will be keyed on A, and at the leaves
+of the index for A will be indices for B, at the leaves of which will be indices
+keyed on C, whose leaves will finally contain the records.
+
+Using a Fractal Trie Indices improves the amortized cost of serving a sequence
+of updates to the materialised view, even if the worst-case cost of an
+individual update is not improved upon. So as well as the benefit of not needing
+to re-calculate parts of the query that have not changed, parts that have
+changed will be updated lazily. Nesting indices will, however, make point
+queries more expensive (but not asymptotically), as we will have to traverse the
+root nodes of indices for B and C as well. For example, when there is only one
+element it will still be nested 3 nodes deep.
+
+## Part (a.ii)
+
+let R1 = {(2i,1) : 1 <= i <= 8 } and R2 = {(4i,2), (4i,3) : 1 <= i <= 4 }
+
+and suppose our tree structures have 4 slots in each node, with the Fractal Trie
+Index using 2 for transaction buffers.
+
+Initially we build our input B+-trees by Bulk-loading:
+
+R1:
+[10| | | ]
+[2,1|4,1|6,1|8,1] [10,1|12,1|14,1|16,1]
+
+R2:
+[12| | | ]
+[4,2|4,3|8,2|8,3] [12,2|12,3|16,2|16,3]
+
+Then we perform a leapfrog trie join to produce a sorted output which we then
+bulk-load into the Fractal Trie Index:
+
+[12|\|]
+[4|8\|][16|\|]
+[1|/|] [1|/|] [1|/|] [1|/|]
+[4,1,2|4,1,3||] [8,1,2|8,1,3||] [12,1,2|12,1,3||] [16,1,2|16,1,3||]
+
+Now suppose +R(4,2), then we update R1:
+
+[6|10| | ]
+[2,1|4,1|4,2| ] [6,1|8,1| | ] [10,1|12,1|14,1|16,1]
+
+Then we seek for 4 in our tree of R2, finding (4,2) and (4,3). This causes us to
+insert (4,2,2) and (4,2,3) into the view:
+
+[12|/+(4,2,2)|+(4,2,3)]
+[4|8\|][16|\|]
+[1|/|] [1|/|] [1|/|] [1|/|]
+[4,1,2|4,1,3||] [8,1,2|8,1,3||] [12,1,2|12,1,3||] [16,1,2|16,1,3||]
+
+Then suppose we -R2(4,3). Seeking for 4 in R1 finds (4,1) and (4,2), causing us to delete
+(4,1,3) and (4,2,3) from the view:
+
+[12|/+(4,2,2)|-(4,1,3)]
+[4|8\|][16|\|]
+[1|/|] [1|/|] [1|/|] [1|/|]
+[4,1,2|4,1,3||] [8,1,2|8,1,3||] [12,1,2|12,1,3||] [16,1,2|16,1,3||]
+
+Finally, if we +R1(12,2), we must insert (12,2,2) and (12,2,3), giving:
+
+[12|/+(4,2,2)|-(4,1,3)|+(12,2,2)|+(12,2,3)]
+[4|8\|][16|\|]
+[1|/|] [1|/|] [1|/|] [1|/|]
+[4,1,2|4,1,3||] [8,1,2|8,1,3||] [12,1,2|12,1,3||] [16,1,2|16,1,3||]
+
+The root node's transaction buffer is over-full, so we flush. Both children have
+an equal number of transactions, so we break the tie by choosing the child with
+lower key (we could choose the emptier child, but to check this would require
+reading pages which we are trying to avoid):
+
+[12|/+(12,2,2)|+(12,2,3)]
+[4|8\+(4,2,2)|-(4,1,3)][16|\|]
+[1|/|] [1|/|] [1|/|] [1|/|]
+[4,1,2|4,1,3||] [8,1,2|8,1,3||] [12,1,2|12,1,3||] [16,1,2|16,1,3||]
+
+In the case of a count query:
+* Initially C = 8
+* +R1(4,2)   +2 records => C = 10
+* -R2(4,3)   -2 records => C = 8
+* +R1(12,2), +2 records => C = 10
+
+## Part (a.iii)
+
+We will use the IO Model to measure performance, counting the number of Page
+reads and writes required for each operation, in the worst-case.
+
+Let
+* m   = the number of updates to deal with.
+* P1  = the size of R1, in pages
+* P2  = the size of R2, in pages
+* PV  = the size of the materialised view.
+* T   = the total number of records add/removed in the view.
+* sqrt(B)     = The branch factor.
+* B - sqrt(B) = The size of the transaction buffer.
+
+W.l.o.g. let P1 <= P2
+
+Joining R1 and R2 using LeapFrog Trie Join (assuming they are already sorted),
+will cost:
+
+* P1 + P2 I/O's to merge
+* PV to materialize
+
+So an equijoin query will take O(m(P1 + P2 + PV)) IOs and a count query
+will take O(m(P1 + P2)) IOs to maintain.
+
+Using IncDB's approach, it will cost:
+
+* For each update, we will scan a table to find corresponding records, in the
+worst case this would take P2 I/O's.
+* For each of the corresponding records, we issue a transaction. To minimise the
+number of times we write the root node of the view back, we will pin it whilst
+writing transactions for each update.
+* Whenever we flush the buffer, we have atleast B - sqrt(B) transactions
+waiting, and we are flushing to the child with the most waiting transactions,
+which will be therefore be atleast (B - sqrt(B))/ sqrt(B) ~= sqrt(B), so, the
+cost of flushing an individual transaction will be at most 1/sqrt(B).
+* Each transaction we add will be flushed at most 2logB(PV) times.
+
+* mP2 I/O's to scan
+* m I/O's to write the root node back.
+* 2TlogB(PV)/sqrt(B) I/O's to flush transactions.
+
+So we have that an equijoin query can be maintained with O(mP2 +
+TlogB(PV)/sqrt(B)) IO's and a count query with O(mP2) I/O's using IncDB.
+
+These figures remain unchanged if instead of m individual updates we are dealing
+with m bulk updates.
+
+In the case of the count query the improvement is obvious, we avoid scanning a
+whole table. With equijoins, it is not always clear that the we will see an
+improvement. In pathological cases, each update may change the query result
+wildly. This would result in the index having to process a great many
+transactions, and in that case it may be more efficient to recompute the result
+from scratch. However, in typical cases where each update does not change the
+overall result a great deal (T is small), we can see clear improvements.
+
+## Parts (b) and (c)
+
+Now suppose we have k tables R1,...,Rk that we wish to join together. We
+generalise the algorithm from part (a), implementing a fully-fledged trie join
+between the updated record and every other table.
+
+We will require that there is a global ordering of variables mentioned in the
+query (of which there are `v`).
+
+To facilitate this, we update the iterator interface adding `I.open()` and
+`I.up()`, descend and ascend levels in the trie. Each level corresponds to a
+variable in the query, with the order given by the global ordering. If a trie
+has no values at a given level (the table it is representing is not
+participating in the join over this query variable) then the trie will return
+-\infty for the key. We will use this to skip such iterators during the join.
+
+We also add a function `singleton(i, x, j, y)`, this takes levels `i` and `j` and
+elements `x` and `y` and produces a trie iterator:
+
+    singleton(i, x, j, y):
+      it = {depth: 0, pos: 0}
+
+      it.open(): it.depth <- it.depth + 1
+      it.up():   it.depth <- it.depth - 1
+      it.next(): it.pos   <- it.pos + 1
+
+      it.key():
+        if it.pos == 0 then
+          if it.depth == i then
+            return x
+          if it.depth == j then
+            return y
+
+        return -\infty
+
+This can be used in place of a table's scan iterator in the Leap-Frog Trie Join.
+
+W.l.o.g. all updates are on R1. Call the positions of R1's parameters in the
+ordering `p1` and `p2` respectively. The outermost loop remains unchanged, so we
+focus on the update routine:
+
+### Equijoin query
+
+    update(+R1(x,y)):
+      if not R1.insert(x,y) then
+        return
+
+      added <- singleton(p1, x, p2, y)
+      S <- [added, R2.scan(), ..., Rk.scan()]
+
+      for s in S do
+        if s.atEnd() then
+          return
+
+      rec   <- new int[v];
+      depth <- 0
+
+      var i, last
+      let init_for_depth()
+        sort_by(S, \s -> s.key())
+        i    <- 0
+        last <- S[k - 1].key()
+
+      init_for_depth()
+      loop
+        if S[i].atEnd() then
+          if depth = 0 then
+            return
+          else
+            depth <- depth - 1
+            for s in S do s.up()
+            S[i].next()
+            init_for_depth()
+            continue
+
+        curr <- S[i].key()
+        if curr == -\infty then
+          continue
+
+        if curr == last then
+          rec[depth] <- curr
+          if depth == v - 1 then
+            V.insert(rec)
+            S[i].next()
+            i <- i + 1
+          else
+            depth <- depth + 1
+            for s in S do s.open()
+            init_for_depth()
+        else
+          S[i].seek(last)
+          last <- S[i].key()
+          i <- i + 1 mod k
+
+    update(-R1(x,y)):
+      if not R1.delete(x,y) then
+        return
+
+      removed <- singleton(p1, x, p2, y)
+      S <- [removed, R2.scan(), ..., Rk.scan()]
+
+      for s in S do
+        if s.atEnd() then
+          return
+
+      rec   <- new int[v];
+      depth <- 0
+
+      var i, last
+      let init_for_depth()
+        sort_by(S, \s -> s.key())
+        i    <- 0
+        last <- S[k - 1].key()
+
+      init_for_depth()
+      loop
+        if S[i].atEnd() then
+          if depth = 0 then
+            return
+          else
+            depth <- depth - 1
+            for s in S do s.up()
+            S[i].next()
+            init_for_depth()
+            continue
+
+        curr <- S[i].key()
+        if curr == -\infty then
+          continue
+
+        if curr == last then
+          rec[depth] <- curr
+          if depth == v - 1 then
+            V.delete(rec)
+            S[i].next()
+            i <- i + 1
+          else
+            depth <- depth + 1
+            for s in S do s.open()
+            init_for_depth()
+        else
+          S[i].seek(last)
+          last <- S[i].key()
+          i <- i + 1 mod k
+
+### Count query
+
+    update(+R1(x,y)):
+      if not R1.insert(x,y) then
+        return
+
+      added <- singleton(p1, x, p2, y)
+      S <- [added, R2.scan(), ..., Rk.scan()]
+
+      for s in S do
+        if s.atEnd() then
+          return
+
+      rec   <- new int[v];
+      depth <- 0
+
+      var i, last
+      let init_for_depth()
+        sort_by(S, \s -> s.key())
+        i    <- 0
+        last <- S[k - 1].key()
+
+      init_for_depth()
+      loop
+        if S[i].atEnd() then
+          if depth = 0 then
+            return
+          else
+            depth <- depth - 1
+            for s in S do s.up()
+            S[i].next()
+            init_for_depth()
+            continue
+
+        curr <- S[i].key()
+        if curr == -\infty then
+          continue
+
+        if curr == last then
+          rec[depth] <- curr
+          if depth == v - 1 then
+            C <- C + 1
+            S[i].next()
+            i <- i + 1
+          else
+            depth <- depth + 1
+            for s in S do s.open()
+            init_for_depth()
+        else
+          S[i].seek(last)
+          last <- S[i].key()
+          i <- i + 1 mod k
+
+    update(-R1(x,y)):
+      if not R1.delete(x,y) then
+        return
+
+      removed <- singleton(p1, x, p2, y)
+      S <- [removed, R2.scan(), ..., Rk.scan()]
+
+      for s in S do
+        if s.atEnd() then
+          return
+
+      rec   <- new int[v];
+      depth <- 0
+
+      var i, last
+      let init_for_depth()
+        sort_by(S, \s -> s.key())
+        i    <- 0
+        last <- S[k - 1].key()
+
+      init_for_depth()
+      loop
+        if S[i].atEnd() then
+          if depth = 0 then
+            return
+          else
+            depth <- depth - 1
+            for s in S do s.up()
+            S[i].next()
+            init_for_depth()
+            continue
+
+        curr <- S[i].key()
+        if curr == -\infty then
+          continue
+
+        if curr == last then
+          rec[depth] <- curr
+          if depth == v - 1 then
+            C <- C - 1
+            S[i].next()
+            i <- i + 1
+          else
+            depth <- depth + 1
+            for s in S do s.open()
+            init_for_depth()
+        else
+          S[i].seek(last)
+          last <- S[i].key()
+          i <- i + 1 mod k
+
+### Data Structures
+
+The materialised view data structure remains unchanged, although now, the order
+in which indices are nested is governed by the global ordering.
+
+The main change is that now, the input tables are stored in a similarly nested
+structure --- a B+-trie -- Like a Fractal Trie Index except that it applies updates
+eagerly. These are nested according to the global ordering as well. This will
+improve the performance of trie iterator operations, with the caveat being that
+point queries on nested operations will suffer worse performance (by a constant
+factor). As we are aiming to improve the performance of writes on the
+materialised view, this is not a difficult tradeoff to make.
+
+### Analysis
+
+Let
+* m  = number of updates to serve
+* Pi = the number of pages in table Ri
+* PV = the number of pages in the materialised view
+* T  = the total number of records add/removed in the view.
+* sqrt(B)     = The branch factor.
+* B - sqrt(B) = The size of the transaction buffer.
+
+W.l.o.g. let P1 <= P2 <= ... <= Pk
+
+As before, when maintaining an equijoin query, NaiveDB performs a merge over all
+tables, which in the worst-case will involve scanning all the tables.
+
+* Equijoin: O(m(PV + kPk))
+* Count:    O(mkPk)
+
+For each update, IncDB will scan all but one of the tables, which in the
+worst-case will involve kPk - P1 IOs. The cost to updating the view remains the
+same, however.
+
+* Equijoin: O(m(kPk - P1) + TlogB(PV)/sqrt(B))
+* Count:    O(m(kPk - P1))
