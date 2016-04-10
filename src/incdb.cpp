@@ -40,7 +40,7 @@ main(int, char **)
     R[2]->loadFromFile("data/R2.txt");
 
     cout << "Initialising Query..." << endl;
-    DB::NaiveCount query(3, R);
+    DB::NaiveEquiJoin query(3, R);
     query.recompute();
 
     cout << "Running Transactions..." << endl;
