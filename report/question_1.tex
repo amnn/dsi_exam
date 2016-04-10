@@ -1,1 +1,206 @@
+This design is based on LeapFrog Trie-Join (CITATION: Veldhuizen 2013) and Fractal Tree Indices, as implemented by \textit{TokuDB}. We differentiate from each of these by:
+\begin{itemize}
+  \item Combining their disparate techniques.
+  \item Adapting LeapFrog Trie-Join for use in the incremental setting.
+  \item Further adapting it to count records without materialising them.
+  \item Improving the amortized time complexity and number of IO's by taking advantage of the write-heavy access patterns to the materialised view.
+  \item Providing expositions of the concrete data structures used to implement LeapFrog Trie-Join. This implementation is hinted at in the paper, but not explicitly given, as much of their paper deals with the algorithm written in terms of interfaces.
+\end{itemize}
+
 \subsection{Part (a)}\label{sec:q-1-a}
+The algorithm relies heavily on the fact that tables do not contain duplicate values. Suppose we insert $t$ into $R_1$, then we have two cases.
+
+Suppose $t\notin R_1$, then
+\begin{itemize}
+  \step[\imps] $(R_1\bowtie R_2)\cap(\{t\}\bowtie R_2) = \varnothing$
+  \step[\imps] $\abs{(R_1\cup\{t\})\bowtie R_2} = \abs{R_1\bowtie R_2} + \abs{\{t\}\bowtie R_2}$
+\end{itemize}
+
+Suppose $t\in R_1$, then
+\begin{itemize}
+  \step[\imps] $\{t\}\bowtie R_2\subseteq R_1\bowtie R_2$
+  \step[\imps] $\abs{(R_1\cup\{t\})\bowtie R_2} = \abs{R_1\bowtie R_2}$
+\end{itemize}
+
+Similarly, if we remove $t$ from $R_2$, we have two cases. Firstly, suppose $t\in R_1$, then
+\begin{itemize}
+  \step[\imps] $(R_1\setminus\{t\})\bowtie R_2 = (R_1\bowtie R_2)\setminus(\{t\}\bowtie R_2)$
+  \marginnote{By the uniqueness of records in a table.}
+  \step[\imps] $\abs{(R_1\setminus\{t\})\bowtie R_2} = \abs{R_1\bowtie R_2} - \abs{\{t\}\bowtie R_2}$
+  \marginnote{$\{t\}\bowtie R_2\subseteq R_2\bowtie R_2$ as before.}
+\end{itemize}
+
+And when $t\notin R_1$, we have
+\begin{itemize}
+  \step[\imps] $(R_1\setminus\{t\})\bowtie R_2 = R_1\bowtie R_2$
+  \step[\imps] $\abs{(R_1\setminus\{t\})\bowtie R_2} = \abs{R_1\bowtie R_2}$
+\end{itemize}
+
+From these results we see that (a) If the operation is redundant, then the query result does not need to be altered, and (b) If ther operation is not redundant, we may compute a much smaller join (as in the hint) and use that to update the query result. In the case of \texttt{COUNT} queries, this means we do not need to materialise the join, but instead may keep a running total.
+
+The pseudo-code that follows will be written in terms of the interfaces, given in Figures \ref{iface:table}, \ref{iface:iterator} and \ref{iface:view}.
+
+\begin{marginfigure}
+  \textbf{\texttt{T\,:\,table}}
+  \begin{description}
+    \item[\texttt{T.insert(r\,:\,record)\,:\,bool}]
+      Insert \texttt{r} into \texttt{T}, if it does not already exist there. Returns \texttt{true} iff \texttt{T} changed as a result of the operation.
+    \item[\texttt{T.delete(r\,:\,record)\,:\,bool}]
+      Remove \texttt{r} from \texttt{T}, returning \texttt{true} iff \texttt{T} changed as a result of the operation.
+    \item[\texttt{T.scan()\,:\,iterator}]
+      Return an iterator by which we may scan through the records of \texttt{T}.
+  \end{description}
+  \caption{The interface for a table, which is used to store the input data.}\label{iface:table}
+\end{marginfigure}
+
+\begin{marginfigure}
+  \textbf{\texttt{I\,:\,iterator}}
+  \begin{description}
+    \item[\texttt{I.key()\,:\,int}]
+      Return the value of the record's key at the current position.
+    \item[\texttt{I.get()\,:\,record}]
+      Return the record at the current position.
+    \item[\texttt{I.next()}]
+      Move the iterator's cursor one step forward.
+    \item[\texttt{I.seek(key\,:\,int)}]
+      Move the iterator to the first record after its current position with a key greater than or equal to the one provided (or to the end if such a record does not exist).
+    \item[\texttt{I.atEnd()\,:\,bool}]
+      Returns \texttt{true} iff the iterator's cursor has passed the last record.
+  \end{description}
+  \caption{The interface for an iterator.}\label{iface:iterator}
+\end{marginfigure}
+
+\begin{marginfigure}
+  \textbf{\texttt{V\,:\,view}}
+  \begin{description}
+    \item[\texttt{T.insert(r\,:\,record)}]
+    \item[\texttt{T.delete(r\,:\,record)}]
+  \end{description}
+  \caption{Views have a similar interface to tables, but do not return a boolean after an update, allowing them up apply updates lazily. This class represents the materialised result of a join.}\label{iface:view}
+\end{marginfigure}
+
+\subsection{Part (a.i)}\label{sec:q-1-a-i}
+
+W.l.o.g. suppose we have a sequence of updates $(u_i)_{i=1}^n$, all for $R_1$, we simply serve them sequentially:
+
+\begin{algorithm}
+  \SetKwFunction{Update}{update}
+  \For{$i\gets 1,\ldots,n$}{
+    \Update{$u_i$}
+  }
+  \caption{Outer loop}
+\end{algorithm}
+
+And then we serve each update as follows:
+
+\begin{algorithm}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{RInsert}{$R_1$.insert}
+  \SetKwFunction{VInsert}{$V$.insert}
+  \SetKwFunction{Scan}{$R_2$.scan}
+  \SetKwFunction{Seek}{$S_2$.seek}
+  \SetKwFunction{Key}{$S_2$.key}
+  \SetKwFunction{AtEnd}{$S_2$.atEnd}
+  \SetKwFunction{Get}{$S_2$.get}
+  \SetKwFunction{Next}{$S_2$.next}
+  \SetKwFunction{Not}{not}
+
+  \Input{$+R_1(a, b)$}
+  \Begin{
+      \If{\Not\RInsert{a, b}}{
+        return\;
+      }
+      $S_2\gets $\Scan{}\;
+      \Seek{a}\;
+      \While{$\Key{} = a\wedge\Not~\AtEnd{}$}{
+        $(a^\prime,c)\gets $\Get{}\;
+        \VInsert{a, b, c}\;
+        \Next{}\;
+      }
+    }
+  \caption{Updating an Equijoin query after an insertion, assuming \texttt{V\,:\,view} holds the current result.}\label{alg:up-join-insert}
+\end{algorithm}
+\begin{algorithm}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{RDelete}{$R_1$.delete}
+  \SetKwFunction{VDelete}{$V$.delete}
+  \SetKwFunction{Scan}{$R_2$.scan}
+  \SetKwFunction{Seek}{$S_2$.seek}
+  \SetKwFunction{Key}{$S_2$.key}
+  \SetKwFunction{AtEnd}{$S_2$.atEnd}
+  \SetKwFunction{Get}{$S_2$.get}
+  \SetKwFunction{Next}{$S_2$.next}
+  \SetKwFunction{Not}{not}
+  \Input{$-R_1(a, b)$}
+  \Begin{
+      \If{\Not\RDelete{a, b}}{
+        return\;
+      }
+      $S_2\gets $\Scan{}\;
+      \Seek{a}\;
+      \While{$\Key{} = a\wedge\Not~\AtEnd{}$}{
+        $(a^\prime,c)\gets $\Get{}\;
+        \VDelete{a, b, c}\;
+        \Next{}\;
+      }
+    }
+  \caption{Updating an Equijoin query after a deletion, assuming \texttt{V\,:\,view} holds the current result.}\label{alg:up-join-delete}
+\end{algorithm}
+
+\begin{algorithm}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{RInsert}{$R_1$.insert}
+  \SetKwFunction{Scan}{$R_2$.scan}
+  \SetKwFunction{Seek}{$S_2$.seek}
+  \SetKwFunction{Key}{$S_2$.key}
+  \SetKwFunction{AtEnd}{$S_2$.atEnd}
+  \SetKwFunction{Get}{$S_2$.get}
+  \SetKwFunction{Next}{$S_2$.next}
+  \SetKwFunction{Not}{not}
+
+  \Input{$+R_1(a, b)$}
+  \Begin{
+      \If{\Not\RInsert{a, b}}{
+        return\;
+      }
+      $S_2\gets $\Scan{}\;
+      \Seek{a}\;
+      \While{$\Key{} = a\wedge\Not~\AtEnd{}$}{
+        $(a^\prime,c)\gets $\Get{}\;
+        $C\gets C + 1$\;
+        \Next{}\;
+      }
+    }
+  \caption{Updating a Count query after an insertion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-join-insert}
+\end{algorithm}
+\begin{algorithm}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{RDelete}{$R_1$.delete}
+  \SetKwFunction{Scan}{$R_2$.scan}
+  \SetKwFunction{Seek}{$S_2$.seek}
+  \SetKwFunction{Key}{$S_2$.key}
+  \SetKwFunction{AtEnd}{$S_2$.atEnd}
+  \SetKwFunction{Get}{$S_2$.get}
+  \SetKwFunction{Next}{$S_2$.next}
+  \SetKwFunction{Not}{not}
+  \Input{$-R_1(a, b)$}
+  \Begin{
+      \If{\Not\RDelete{a, b}}{
+        return\;
+      }
+      $S_2\gets $\Scan{}\;
+      \Seek{a}\;
+      \While{$\Key{} = a\wedge\Not~\AtEnd{}$}{
+        $(a^\prime,c)\gets $\Get{}\;
+        $C\gets C + 1$\;
+        \Next{}\;
+      }
+    }
+  \caption{Updating a Count query after a deletion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-join-delete}
+\end{algorithm}
+
+\subsection{Part (a.ii)}\label{sec:q-1-a-ii}
+\subsection{Part (a.iii)}\label{sec:q-1-a-iii}
+\subsection{Part (a.iv)}\label{sec:q-1-a-iv}
+\subsection{Part (b)}\label{sec:q-1-b}
+\subsection{Part (c)}\label{sec:q-1-c}
