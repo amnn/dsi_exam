@@ -81,17 +81,17 @@ The pseudo-code that follows will be written in terms of the interfaces, given i
 
 \subsection{Part (a.i)}\label{sec:q-1-a-i}
 
-W.l.o.g. suppose we have a sequence of updates $(u_i)_{i=1}^n$, all for $R_1$, we simply serve them sequentially:
+W.l.o.g. suppose we have a sequence of updates $(u_i)_{i=1}^n$, all for $R_1$, we simply serve them sequentially (Algorithm~\ref{alg:up-loop}).
 
 \begin{algorithm}
   \SetKwFunction{Update}{update}
   \For{$i\gets 1,\ldots,n$}{
     \Update{$u_i$}
   }
-  \caption{Outer loop}
+  \caption{Outer loop}\label{alg:up-loop}
 \end{algorithm}
 
-And then we serve each update as follows:
+And then we serve each update as in Algorithms~\ref{alg:up-join-insert} and~\ref{alg:up-join-delete} in the case of Equijoin queries, and Algorithms~\ref{alg:up-count-insert} and~\ref{alg:up-count-delete} in the case of Count queries.
 
 \begin{algorithm}
   \SetKwInOut{Input}{input}
@@ -171,7 +171,7 @@ And then we serve each update as follows:
         \Next{}\;
       }
     }
-  \caption{Updating a Count query after an insertion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-join-insert}
+  \caption{Updating a Count query after an insertion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-count-insert}
 \end{algorithm}
 \begin{algorithm}
   \SetKwInOut{Input}{input}
@@ -196,11 +196,26 @@ And then we serve each update as follows:
         \Next{}\;
       }
     }
-  \caption{Updating a Count query after a deletion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-join-delete}
+  \caption{Updating a Count query after a deletion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-count-delete}
 \end{algorithm}
+
+\subsection{Part (a.iv)}\label{sec:q-1-a-iv}
+
+Next we focus on the data structures we will use to implement the algorithm, as precisely what they are will affect the example runs and the performance analysis.\\[1em]
+
+Our input tables will be stored in clustered B+-trees keyed on $A$, to make the requisite range queries as fast as possible.\\[1em]
+
+The materialised view will be stored in a Fractal Tree Index: A write-optimized data structure similar to a B+-tree, but at each internal node, some space is reserved for a list of pending transactions, which is shared equally amongst the node's children. When an update is made to the structure, if the root node is a leaf, it is applied immediately, but if not, it is added to the transaction buffer corresponding to the child node it would have been sent to.\\[1em]
+
+If a transaction buffer becomes full, its contents will be flushed to its corresponding child. Flushes may cascade all the way down to leaf nodes.\\[1em]
+
+At most one transaction can be held in a buffer for any one record, $r$. If two transactions $t_1$, followed by $t_2$ are put into the same buffer, both pertaining to $r$, we always keep the later one (in this case, $t_2$).\\[1em]
+
+To ensure reads stay consistent with writes, when making point queries, we must check the transaction buffers of nodes we go through, and similarly, when making range queries, we must first flush all transaction buffers corresponding to ancestor nodes of leaves we may touch.\\[1em]
+
+Using a Fractal Tree Index improves the amortized cost of serving a sequence of updates to the materialised view, even if the worst-case cost of an individual update is not improved upon. This is ideal in our case as we are trying to make maintaining the materialised view (an exclusively write heavy operation) as cheap as possible.
 
 \subsection{Part (a.ii)}\label{sec:q-1-a-ii}
 \subsection{Part (a.iii)}\label{sec:q-1-a-iii}
-\subsection{Part (a.iv)}\label{sec:q-1-a-iv}
 \subsection{Part (b)}\label{sec:q-1-b}
 \subsection{Part (c)}\label{sec:q-1-c}
