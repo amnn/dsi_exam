@@ -216,6 +216,44 @@ To ensure reads stay consistent with writes, when making point queries, we must 
 Using a Fractal Tree Index improves the amortized cost of serving a sequence of updates to the materialised view, even if the worst-case cost of an individual update is not improved upon. This is ideal in our case as we are trying to make maintaining the materialised view (an exclusively write heavy operation) as cheap as possible.
 
 \subsection{Part (a.ii)}\label{sec:q-1-a-ii}
+
 \subsection{Part (a.iii)}\label{sec:q-1-a-iii}
-\subsection{Part (b)}\label{sec:q-1-b}
-\subsection{Part (c)}\label{sec:q-1-c}
+We will use the IO Model to measure performance, counting the number of page reads and writes required for each operation, in the worst-case.
+
+\begin{flalign*}
+  \text{Let}\quad m & = \text{ Number of updates to deal with.} &&\\
+  P_1 & = \text{ Number of pages in }R_1 &&\\
+  P_2 & = \text{ Number of pages in }R_2 &&\\
+  P_V & = \text{ Number of pages in the materialised view.} &&\\
+  T & = \text{ The total number of records added/removed from the view.} &&\\
+  B & = \text{ Branch factor of the B+-tree.} &&\\
+  \sqrt{B} & = \text{ Branch factor of the Fractal Tree.} &&\\
+  B - \sqrt{B} & = \text{ Total size of the transaction buffer (shared amongst children).} &&\\
+  \frac{B - \sqrt{B}}{\sqrt{B}} & = \text{ Size of transaction buffer allocated per child.} &&
+\end{flalign*}
+\noindent W.l.o.g. let $P_1\leq P_2$.\\[1em]
+
+Joining $R_1$ and $R_2$ using LeapFrog Trie-Join (assuming they are already sorted) will, in the worst-case cost:
+\begin{itemize}
+  \item $P_1 + P_2$ IO's to merge.
+  \item $P_V$ IO's to materialize.
+\end{itemize}
+So, the na\:ive implementation will take $O(m(P_1 + P_2 + P_V))$ IO's to maintain an equijoin query, and $O(m(P1 + P2)$ IO's to maintain a count query, in the worst-case.\\[1em]
+
+An incremental approach incurs the following costs:
+\begin{itemize}
+  \item For each update to one table, we will scan the other table to find corresponding records. In the worst case this would take $P_2$ IO's.
+  \item For each of the corresponding records, we issue a transaction. To minimise the number of times we write the root node of the view back, we pin it.
+  \item Whenever we flush a transaction buffer, it is because we have more than $\frac{B - \sqrt{B}}{\sqrt{B}}=O(\sqrt{B})$ transactions waiting --- this follows because we only flush when the transaction buffer is full. A single flush costs $1$ IO, so the amortized cost per transaction is $\frac{1}{\sqrt{B}}$.
+  \item Each transaction we add will be flushed at most $2\log_B(P_V)$ times.
+  \item $mP_2$ IO's are spent scanning.
+  \item $\frac{2T\log_B(P_V)}{\sqrt{B}}$ IO's are spent flush transactions.
+\end{itemize}
+
+So we have than an equijoin query can be maintained with ${O(mP_2 + \frac{T\log_B(P_V)}{\sqrt{B}})}$ IO's and a count query with $O(mP_2)$ IO's. It is also worth noting that in the case of the former, we assumed in our analysis that all the transactions would be flushed all the way to the leaves during the course of maintaining the view, whereas this is not necessarily the case.
+
+In both the na\:ive and incremental setting, these figures remain unchanged if instead of $m$ individual updates, we are dealing with $m$ bulk updates.\\[1em]
+
+In the case of the count query, the improvement is obvious: We avoid the cost of scanning a whole table, for every update. With equijoins, it is not always clear that we will see an improvement. In pathological cases, each update may change the query result wildly. This would result in the index having to process a great many transactions, and in that case, it may be more efficient to recompute the result from scratch. However, in typical cases where each update does not change the overall result a great deal ($T$ is small), we can see clear improvements.
+
+\subsection{Part (b/c)}\label{sec:q-1-b}
