@@ -108,7 +108,7 @@ And then we serve each update as in Algorithms~\ref{alg:up-join-insert} and~\ref
   \Input{$+R_1(a, b)$}
   \Begin{
       \If{\Not\RInsert{a, b}}{
-        return\;
+        \KwRet\;
       }
       $S_2\gets $\Scan{}\;
       \Seek{a}\;
@@ -134,7 +134,7 @@ And then we serve each update as in Algorithms~\ref{alg:up-join-insert} and~\ref
   \Input{$-R_1(a, b)$}
   \Begin{
       \If{\Not\RDelete{a, b}}{
-        return\;
+        \KwRet\;
       }
       $S_2\gets $\Scan{}\;
       \Seek{a}\;
@@ -161,7 +161,7 @@ And then we serve each update as in Algorithms~\ref{alg:up-join-insert} and~\ref
   \Input{$+R_1(a, b)$}
   \Begin{
       \If{\Not\RInsert{a, b}}{
-        return\;
+        \KwRet\;
       }
       $S_2\gets $\Scan{}\;
       \Seek{a}\;
@@ -186,7 +186,7 @@ And then we serve each update as in Algorithms~\ref{alg:up-join-insert} and~\ref
   \Input{$-R_1(a, b)$}
   \Begin{
       \If{\Not\RDelete{a, b}}{
-        return\;
+        \KwRet\;
       }
       $S_2\gets $\Scan{}\;
       \Seek{a}\;
@@ -205,7 +205,7 @@ Next we focus on the data structures we will use to implement the algorithm, as 
 
 Our input tables will be stored in clustered B+-trees keyed on $A$, to make the requisite range queries as fast as possible.\\[1em]
 
-The materialised view will be stored in a Fractal Tree Index: A write-optimized data structure similar to a B+-tree, but at each internal node, some space is reserved for a list of pending transactions, which is shared equally amongst the node's children. When an update is made to the structure, if the root node is a leaf, it is applied immediately, but if not, it is added to the transaction buffer corresponding to the child node it would have been sent to.\\[1em]
+The materialised view will be stored in a Fractal Tree Index, again keyed on $A$. Fractal Tree Indices are write-optimized data structures similar to the B+-tree, but at each internal node, some space is reserved for a list of pending transactions, which is shared equally amongst the node's children. When an update is made to the structure, if the root node is a leaf, it is applied immediately, but if not, it is added to the transaction buffer corresponding to the child node it would have been sent to.\\[1em]
 
 If a transaction buffer becomes full, its contents will be flushed to its corresponding child. Flushes may cascade all the way down to leaf nodes.\\[1em]
 
@@ -213,7 +213,7 @@ At most one transaction can be held in a buffer for any one record, $r$. If two 
 
 To ensure reads stay consistent with writes, when making point queries, we must check the transaction buffers of nodes we go through, and similarly, when making range queries, we must first flush all transaction buffers corresponding to ancestor nodes of leaves we may touch.\\[1em]
 
-Using a Fractal Tree Index improves the amortized cost of serving a sequence of updates to the materialised view, even if the worst-case cost of an individual update is not improved upon. This is ideal in our case as we are trying to make maintaining the materialised view (an exclusively write heavy operation) as cheap as possible.
+Using a Fractal Tree Index improves the amortized cost of serving a sequence of updates to the materialised view, even if the worst-case cost of an individual update is not improved upon. This is ideal in our case as we are trying to make maintaining the materialised view (an exclusively write heavy operation) as cheap as possible. The trade-off is that reading the database is less efficient, by a constant factor, because the fan-out of the tree structure is reduced, and we must check transaction buffers as well as leaves.
 
 \subsection{Part (a.ii)}\label{sec:q-1-a-ii}
 
@@ -238,7 +238,7 @@ Joining $R_1$ and $R_2$ using LeapFrog Trie-Join (assuming they are already sort
   \item $P_1 + P_2$ IO's to merge.
   \item $P_V$ IO's to materialize.
 \end{itemize}
-So, the na\:ive implementation will take $O(m(P_1 + P_2 + P_V))$ IO's to maintain an equijoin query, and $O(m(P1 + P2)$ IO's to maintain a count query, in the worst-case.\\[1em]
+So, the na\"ive implementation will take $O(m(P_1 + P_2 + P_V))$ IO's to maintain an equijoin query, and $O(m(P1 + P2))$ IO's to maintain a count query, in the worst-case.\\[1em]
 
 An incremental approach incurs the following costs:
 \begin{itemize}
@@ -247,13 +247,271 @@ An incremental approach incurs the following costs:
   \item Whenever we flush a transaction buffer, it is because we have more than $\frac{B - \sqrt{B}}{\sqrt{B}}=O(\sqrt{B})$ transactions waiting --- this follows because we only flush when the transaction buffer is full. A single flush costs $1$ IO, so the amortized cost per transaction is $\frac{1}{\sqrt{B}}$.
   \item Each transaction we add will be flushed at most $2\log_B(P_V)$ times.
   \item $mP_2$ IO's are spent scanning.
-  \item $\frac{2T\log_B(P_V)}{\sqrt{B}}$ IO's are spent flush transactions.
+  \item $\frac{2T\log_B(P_V)}{\sqrt{B}}$ IO's are spent flushing transactions.
 \end{itemize}
 
-So we have than an equijoin query can be maintained with ${O(mP_2 + \frac{T\log_B(P_V)}{\sqrt{B}})}$ IO's and a count query with $O(mP_2)$ IO's. It is also worth noting that in the case of the former, we assumed in our analysis that all the transactions would be flushed all the way to the leaves during the course of maintaining the view, whereas this is not necessarily the case.
+So we have that an equijoin query can be maintained with ${O(mP_2 + \frac{T\log_B(P_V)}{\sqrt{B}})}$ IO's and a count query with $O(mP_2)$ IO's. It is also worth noting that in the case of the former, we assumed in our analysis that all the transactions would be flushed all the way to the leaves during the course of maintaining the view, whereas this is not necessarily the case.\\[1em]
 
-In both the na\:ive and incremental setting, these figures remain unchanged if instead of $m$ individual updates, we are dealing with $m$ bulk updates.\\[1em]
+In both the na\"ive and incremental setting, these figures remain unchanged if instead of $m$ individual updates, we are dealing with $m$ bulk updates.\\[1em]
 
 In the case of the count query, the improvement is obvious: We avoid the cost of scanning a whole table, for every update. With equijoins, it is not always clear that we will see an improvement. In pathological cases, each update may change the query result wildly. This would result in the index having to process a great many transactions, and in that case, it may be more efficient to recompute the result from scratch. However, in typical cases where each update does not change the overall result a great deal ($T$ is small), we can see clear improvements.
 
 \subsection{Part (b/c)}\label{sec:q-1-b}
+
+Now suppose we have $k$ tables, $R_1,\ldots,R_k$ that we wish to join together. We generalise the algorithm from part (a), implementing a fully-fledged Trie-Join between the updated record and every other table.\\[1em]
+
+Firstly, we require that there is a global ordering of variables --- of which there are $v$ --- mentioned in the query. For instance, in the case of $R_1(A,B)\bowtie R_2(A,C)\bowtie R_3(B,C)$, we may choose $A\prec B\prec C$. We may then represent tables by tries whose ordering is determined as a subsequence of this global ordering.\\[1em]
+
+\begin{marginfigure}
+  \textbf{\texttt{I\,:\,iterator}}
+  \begin{description}
+    \item[\texttt{I.open()}]
+      Move the iterator's cursor one level deeper, positioning the cursor at the first available key there.
+    \item[\texttt{I.up()}]
+      Move the iterator's cursor back up one level, positioning the cursor at the parent key at this depth.
+    \item[\texttt{I.atValidDepth()\,:\,bool}]
+      Returns \texttt{true} iff the table represented by this iterator should participte in the join over the query variable corresponding to the iterator's current depth.
+  \end{description}
+  \caption{Additions to the iterator interface, making it a trie iterator.}\label{iface:trie-iterator}
+\end{marginfigure}
+
+Secondly, we augment the iterator interface (Figure~\ref{iface:trie-iterator}), to descend and ascend levels in the trie representation of tables (CITATION). If a trie has no values at a given level (the table it is representing is not participating in the join over this query variable) then the trie will return $-\infty$ for the key.\\[1em]
+
+With the introduction of this trie representation, \texttt{I.get()} becomes redundant: Consumers of iterators may keep track of the current prefix of the record they are traversing as they move up and down the trie by making calls to \texttt{I.key()}. We provide a higher order function --- \texttt{traverse} --- to capture this notion (Algorithm~\ref{alg:traverse}).\\[1em]
+
+\begin{algorithm}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{Not}{not}
+  \SetKwFunction{Open}{open}
+  \SetKwFunction{Up}{up}
+  \SetKwFunction{Next}{next}
+  \SetKwFunction{Key}{key}
+  \SetKwFunction{AtEnd}{atEnd}
+  \SetKwFunction{Traverse}{traverse}
+  \Input{$\mathit{it}$, The iterator to scan through.}
+  \Input{$\mathit{rec}$, A buffer in which to store the current record}
+  \Input{$\mathit{act}$, A function to call for each new record.}
+  \Input{$\mathit{pos}$, The current level of the iterator.}
+  \Input{$\mathit{depth}$, The maximum level of the iterator.}
+  \Begin{
+      \If{$\mathit{pos}\geq\mathit{depth}$}{
+        $\mathit{act}()$\;
+        \KwRet\;
+      }
+
+      $\mathit{it}$.\Open{}\;
+      \While{\Not$\mathit{it}$.\AtEnd{}} {
+        $\mathit{rec}[\mathit{pos}]\gets \mathit{it}.\Key{}$\;
+        \Traverse{$\mathit{it}$, $\mathit{depth}$, $\mathit{rec}$, $\mathit{act}$, $\mathit{pos} + 1$}\;
+        $\mathit{it}$.\Next{}\;
+      }
+      $\mathit{it}$.\Up{}\;
+  }
+
+  \caption{The \texttt{traverse} function, for scanning through the records in a
+    trie iterator.}\label{alg:traverse}
+\end{algorithm}
+
+Finally, we add a function \texttt{singleton(i, x, j, y\,:\,int)\,:\,iterator}, returning an iterator to a ``table'' containing only the record \texttt{(x, y)} with its first column at position \texttt{i} and its second column at position \texttt{j} in the global ordering (Algorithm~\ref{alg:singleton-it}). This is used to represent the relation containing the updated record, through a trie iterator interface, so that the Trie-Join algorithm may consume it as input.\\[1em]
+
+\begin{algorithm}
+  \SetKwProg{Fn}{func}{}{}
+  \SetKwInOut{Input}{input}
+  \SetKwInOut{Output}{output}
+  \SetKwFunction{Open}{open}
+  \SetKwFunction{Up}{up}
+  \SetKwFunction{Next}{next}
+  \SetKwFunction{Seek}{seek}
+  \SetKwFunction{Key}{key}
+  \SetKwFunction{AtEnd}{atEnd}
+
+  \Input{$i, x, j, y$, where $i, j$ are the positions in the ordering of the first and second columns respectively, and $x, y$ are the values of the first and second columns respectively.}
+  \Output{$it$, an iterator}
+  \Begin{
+      $\mathit{depth}\gets -1$\;
+      $\mathit{done}_i\gets\texttt{false}$\;
+      $\mathit{done}_j\gets\texttt{false}$\;
+      $it\gets\varnothing$\;
+      \Fn{$it$.\Open{}}{
+        $\mathit{depth}\gets\mathit{depth} + 1$\;
+      }
+      \BlankLine
+      \Fn{$it$.\Up{}}{
+        $\mathit{depth}\gets\mathit{depth} - 1$\;
+        $\mathit{done_i}\gets\mathit{done_i}\wedge\mathit{depth}\geq i$\;
+        $\mathit{done_j}\gets\mathit{done_j}\wedge\mathit{depth}\geq j$\;
+      }
+      \BlankLine
+      \Fn{$it$.\Next{}}{
+        $\mathit{done_i}\gets\mathit{done_i}\vee\mathit{depth}=i$\;
+        $\mathit{done_j}\gets\mathit{done_j}\vee\mathit{depth}=j$\;
+      }
+      \BlankLine
+      \Fn{$it$.\Seek{key}}{
+        $\mathit{done_i}\gets\mathit{done_i}~\vee~\mathit{depth}=i\wedge\mathit{key} > x$\;
+        $\mathit{done_j}\gets\mathit{done_j}~\vee~\mathit{depth}=j\wedge\mathit{key} > y$\;
+      }
+      \BlankLine
+      \Fn{$it$.\Key{}}{
+        \uIf{$it$.\AtEnd{}}{
+          \KwRet{$\infty$};
+        }
+        \uElseIf{$\mathit{depth} = i$} {
+          \KwRet{$x$}\;
+        }
+        \uElseIf{$\mathit{depth} = j$} {
+          \KwRet{$y$}\;
+        }
+        \Else{
+          \KwRet{$-\infty$}\;
+        }
+      }
+      \BlankLine
+      \Fn{$it$.\AtEnd{}}{
+        \KwRet{$\mathit{depth} = i\wedge\mathit{done}_i~\vee~\mathit{depth} = j\wedge\mathit{done}_j$}\;
+      }
+      \BlankLine
+      \KwRet{$it$}\;
+    }
+  \caption{Function to produce a singleton relation $\{(x, y)\}$ exposed through the \texttt{iterator} interface.}\label{alg:singleton-it}
+\end{algorithm}
+
+Once again, W.l.o.g. we assume that all our updates are for $R_1$, and furthermore, $R_1$'s columns appear at positions $p_1$ and $p_2$ respectively, in the global ordering. Our outer loop remains unchanged (Algorithm~\ref{alg:up-loop}), but we rephrase our update routines in terms of an implementation of the Trie-Join algorithm (CITATION). We omit the algorithm here as it is available at the cited paper, but assume it is available as \texttt{trie-join(its\,:\,[iterator])\,:\,iterator}. Algorithms~\ref{alg:up-trie-join-insert} and~\ref{alg:up-trie-join-delete} give the new update routines for equijoin queries, and Algorithms~\ref{alg:up-trie-count-insert} and~\ref{alg:up-trie-count-delete} are the new update routiens for count queries.\\[1em]
+
+\begin{algorithm}
+  \SetKwProg{Fn}{func}{}{}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{RInsert}{$R_1$.insert}
+  \SetKwFunction{TrieJoin}{trie-join}
+  \SetKwFunction{Singleton}{singleton}
+  \SetKwFunction{Act}{act}
+  \SetKwFunction{Int}{int}
+  \SetKwFunction{Traverse}{traverse}
+  \SetKwFunction{VInsert}{$V$.insert}
+  \SetKwFunction{Scan}{scan}
+
+  \Input{$+R_1(a, b)$}
+  \Begin{
+      \If{\Not\RInsert{a, b}}{
+        \KwRet\;
+      }
+      $\mathit{its}\gets[\Singleton{$p_1$,\,a,\,$p_2$,\,b},R_2.\Scan{},\ldots,R_k.\Scan{}]$\;
+      $J\gets\TrieJoin{$\mathit{its}$}$\;
+      $r\gets\KwSty{new}~\Int{v}$\;
+      \Fn{\Act{}} {
+        \VInsert{$r$}\;
+      }
+      \Traverse{$J$, $v$, $r$, \Act, $0$}\;
+    }
+  \caption{Updating an Equijoin query after an insertion, assuming \texttt{V\,:\,view} holds the current result, and $v$ is the number of variables in the query.}\label{alg:up-trie-join-insert}
+\end{algorithm}
+\begin{algorithm}
+  \SetKwProg{Fn}{func}{}{}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{RDelete}{$R_1$.delete}
+  \SetKwFunction{TrieJoin}{trie-join}
+  \SetKwFunction{Singleton}{singleton}
+  \SetKwFunction{Act}{act}
+  \SetKwFunction{Int}{int}
+  \SetKwFunction{Traverse}{traverse}
+  \SetKwFunction{VDelete}{$V$.delete}
+  \SetKwFunction{Scan}{scan}
+  \Input{$-R_1(a, b)$}
+  \Begin{
+      \If{\Not\RDelete{a, b}}{
+        \KwRet\;
+      }
+      $\mathit{its}\gets[\Singleton{$p_1$,\,a,\,$p_2$,\,b},R_2.\Scan{},\ldots,R_k.\Scan{}]$\;
+      $J\gets\TrieJoin{$\mathit{its}$}$\;
+      $r\gets\KwSty{new}~\Int{v}$\;
+      \Fn{\Act{}} {
+        \VDelete{$r$}\;
+      }
+      \Traverse{$J$, $v$, $r$, \Act, $0$}\;
+    }
+  \caption{Updating an Equijoin query after a deletion, assuming \texttt{V\,:\,view} holds the current result, and $v$ is the number of variables in the query.}\label{alg:up-trie-join-delete}
+\end{algorithm}
+
+\begin{algorithm}
+  \SetKwProg{Fn}{func}{}{}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{RInsert}{$R_1$.insert}
+  \SetKwFunction{TrieJoin}{trie-join}
+  \SetKwFunction{Singleton}{singleton}
+  \SetKwFunction{Act}{act}
+  \SetKwFunction{Int}{int}
+  \SetKwFunction{Traverse}{traverse}
+  \SetKwFunction{Scan}{scan}
+
+  \Input{$+R_1(a, b)$}
+  \Begin{
+      \If{\Not\RInsert{a, b}}{
+        \KwRet\;
+      }
+      $\mathit{its}\gets[\Singleton{$p_1$,\,a,\,$p_2$,\,b},R_2.\Scan{},\ldots,R_k.\Scan{}]$\;
+      $J\gets\TrieJoin{$\mathit{its}$}$\;
+      $r\gets\KwSty{new}~\Int{v}$\;
+      \Fn{\Act{}} {
+        $C\gets C + 1$\;
+      }
+      \Traverse{$J$, $v$, $r$, \Act, $0$}\;
+    }
+  \caption{Updating a Count query after an insertion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-trie-count-insert}
+\end{algorithm}
+\begin{algorithm}
+  \SetKwProg{Fn}{func}{}{}
+  \SetKwInOut{Input}{input}
+  \SetKwFunction{RDelete}{$R_1$.delete}
+  \SetKwFunction{TrieJoin}{trie-join}
+  \SetKwFunction{Singleton}{singleton}
+  \SetKwFunction{Act}{act}
+  \SetKwFunction{Int}{int}
+  \SetKwFunction{Traverse}{traverse}
+  \SetKwFunction{Scan}{scan}
+
+  \Input{$-R_1(a, b)$}
+  \Begin{
+      \If{\Not\RInsert{a, b}}{
+        \KwRet\;
+      }
+      $\mathit{its}\gets[\Singleton{$p_1$,\,a,\,$p_2$,\,b},R_2.\Scan{},\ldots,R_k.\Scan{}]$\;
+      $J\gets\TrieJoin{$\mathit{its}$}$\;
+      $r\gets\KwSty{new}~\Int{v}$\;
+      \Fn{\Act{}} {
+        $C\gets C - 1$\;
+      }
+      \Traverse{$J$, $v$, $r$, \Act, $0$}\;
+    }
+  \caption{Updating a Count query after a deletion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-trie-count-delete}
+\end{algorithm}
+
+The materialised view data structure remains mostly unchanged, although now, the index is keyed on \textit{all} columns in the result, with the order being given by the global ordering, this is done in the usual way, whereby at each intermediate node, partitioning ``keys'' are in fact entire partitioning \textit{records}.\\[1em]
+
+We transform the representation of input tables in a similar manner, so that they are stored in indices keyed on all of their columns. However, we choose a different tactic to the one we employed for the view here: We nest indices. Let $R(a, b)$ be an input table with its columns having positions in the global ordering $p_a\prec p_b$ respectively, then the index representing $R$ begins (at the root) as an index keyed on $a$, at whose leaves are indices keyed on $b$. We do this because it mirrors the trie representation that we must expose through the \texttt{iterator} interface, and in doing so improves the performance of trie operations. The down-side is that as we nest indices deeper and deeper, we may waste space. For example, in the worst-case, suppose $a$ is a primary key for the relation, then we will end up allocating an entire page (the leaf node for the $b$-keyed index) for each record. As we are nesting only one layer deep, however, this sparsity in the leaves will be manageable.\\[1em]
+
+(WORKED EQUIJOIN EXAMPLE)\\[1em]
+
+(WORKED COUNT EXAMPLE)\\[1em]
+
+\begin{flalign*}
+  \intertext{Now, we turn our attention to performance analysis, and as before, we begin with some definitions.}
+  \text{Let}\quad m & = \text{ Number of updates to deal with.} &&\\
+  P_i & = \text{ Number of pages in }R_i &&\\
+  P_V & = \text{ Number of pages in the materialised view.} &&\\
+  T & = \text{ The total number of records added/removed from the view.} &&\\
+  B & = \text{ Branch factor of the B+-tree.} &&\\
+  \sqrt{B} & = \text{ Branch factor of the Fractal Tree.} &&\\
+  B - \sqrt{B} & = \text{ Total size of the transaction buffer (shared amongst children).} &&\\
+  \frac{B - \sqrt{B}}{\sqrt{B}} & = \text{ Size of transaction buffer allocated per child.} &&
+  \intertext{W.l.o.g. let $P_1\leq P_2\leq\cdots\leq P_k$.}
+\end{flalign*}
+As before, when maintaining an equijoin query, Na\"iveDB performs a merge over all tables, which in the worst-case will involve scanning all the tables:
+\begin{align*}
+  &\textit{Equijoin} && O(m(P_V + kP_k)) &&\\
+  &\textit{Count}    && O(mkP_k) &&
+\end{align*}
+On the other hand, IncDB will scan all but one of the tables, which in the worst-case will involve $kP_k-P_1$ IO's. The cost to updating the remains the same, however.
+\begin{align*}
+  &\textit{Equijoin} && O\left(m(kP_k-P_1) + \frac{T\log_B(P_V)}{\sqrt{B}}\right) &&\\
+  &\textit{Count}    && O(m(kP_k-P_1)) &&
+\end{align*}
