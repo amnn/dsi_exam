@@ -9,9 +9,9 @@
 
 namespace DB {
   /**
-   * FTrie
+   * FTree
    *
-   * Implementation of Nested Fractial Tries. Unlike the Nested B+ Trie
+   * Implementation of Nested Fractial Trees. Unlike the Nested B+ Trie
    * implementation, this one handles arbitrary depth, and relies solely upon
    * splitting and merging to maintain balance (no redistribution).
    *
@@ -19,7 +19,7 @@ namespace DB {
    * implementation is of a multi-key index (where entire records are stored as
    * pivots/partitioning keys). This improves safe efficiency at larger depths.
    *
-   * If the FTrie node has N bytes of space for data, then sqrt(N) of it will be
+   * If the FTree node has N bytes of space for data, then sqrt(N) of it will be
    * used for pointers to children, and the remaining space is used for
    * transactions.
    *
@@ -29,17 +29,17 @@ namespace DB {
    *
    * Transaction space is shared evenly amongst children.
    */
-  struct FTrie {
+  struct FTree {
 
     /**
-     * FTrie::TxnType
+     * FTree::TxnType
      *
      * Tag for transactions.
      */
     enum TxnType : unsigned int { Insert, Delete };
 
     /**
-     * FTrie::Transaction
+     * FTree::Transaction
      *
      * Structure of transactions waiting in a buffer on a node to be flushed to
      * a child. Stores the operation to perform (the "message") as well as the
@@ -55,7 +55,7 @@ namespace DB {
     using NewSlots = std::vector<int> *;
 
     /**
-     * FTrie::Diff
+     * FTree::Diff
      *
      * A log of changes a child node had to make when servicing the flushed
      * transactions.
@@ -69,7 +69,7 @@ namespace DB {
     };
 
     /**
-     * FTrie::leaf
+     * FTree::leaf
      *
      * Create a new leaf node.
      *
@@ -80,7 +80,7 @@ namespace DB {
     static page_id leaf(int width);
 
     /**
-     * FTrie::branch
+     * FTree::branch
      *
      * Create a branch node containing all the partitions provided
      *
@@ -96,16 +96,16 @@ namespace DB {
                           std::vector<int> slots);
 
     /**
-     * FTrie::load
+     * FTree::load
      *
      * @param nid The Page ID of the node to load.
-     * @return The pointer to the page that was loaded, casted as an FTrie
+     * @return The pointer to the page that was loaded, casted as an FTree
      *         pointer.
      */
-    static FTrie *load(page_id nid);
+    static FTree *load(page_id nid);
 
     /**
-     * FTrie::flush
+     * FTree::flush
      *
      * Log transactions to occur on this node and/or its children.
      *
@@ -126,7 +126,7 @@ namespace DB {
     static Diff flush(page_id nid, Family family, int *txns);
 
     /**
-     * FTrie::debugPrint
+     * FTree::debugPrint
      *
      * Print the contents of the tree rooted at this node.
      *
@@ -135,7 +135,7 @@ namespace DB {
     static void debugPrint(page_id nid);
 
     /**
-     * FTrie::debugPrintTxns
+     * FTree::debugPrintTxns
      *
      * Print the contents of the transaction buffer in a human-readable format.
      *
@@ -147,7 +147,7 @@ namespace DB {
     static void debugPrintTxns(int *txns, int txnSize, int width);
 
     /**
-     * FTrie::debugPrintKey
+     * FTree::debugPrintKey
      *
      * Format and print a key of the given length.
      *
@@ -157,7 +157,7 @@ namespace DB {
     static void debugPrintKey(int *key, int width);
 
     /**
-     * FTrie::split
+     * FTree::split
      *
      * Share the contents of this node between itself and a new neighbour to the
      * right.
@@ -170,7 +170,7 @@ namespace DB {
     page_id split(page_id pid, int *key);
 
     /**
-     * FTrie::merge
+     * FTree::merge
      *
      * Append the slots and transaction buffers from the other node onto the end
      * of this node's. Pre conditions include: The types of this node and that
@@ -182,38 +182,38 @@ namespace DB {
      * @param part Pointer to the key that partitions these two nodes (When
      *             merging branches, this needs to be added back in).
      */
-    void merge(page_id nid, FTrie *that, int *part);
+    void merge(page_id nid, FTree *that, int *part);
 
     /**
-     * FTrie::isEmpty
+     * FTree::isEmpty
      *
      * Check if the node has no slots filled.
      */
     bool isEmpty() const;
 
     /**
-     * FTrie::isFull
+     * FTree::isFull
      *
      * Check if the node is full (all slots filled)
      */
     bool isFull() const;
 
     /**
-     * FTrie::isUnderOccupied
+     * FTree::isUnderOccupied
      *
      * Check if more than half the nodes are empty.
      */
     bool isUnderOccupied() const;
 
     /**
-     * FTrie::getType
+     * FTree::getType
      *
      * @return the node type.
      */
     NodeType getType() const;
 
     /**
-     * FTrie::slot
+     * FTree::slot
      *
      * @param index The index of the slot
      * @return a pointer to the slot.
@@ -221,7 +221,7 @@ namespace DB {
     int *slot(int index);
 
     /**
-     * FTrie::txns
+     * FTree::txns
      *
      * @param index The index of the slot
      * @return a pointer to the transaction buffer corresponding to the slot.
@@ -229,7 +229,7 @@ namespace DB {
     int *txns(int index);
 
     /**
-     * (private) FTrie::txnSize
+     * (private) FTree::txnSize
      *
      * @return The size of a single transaction message in this node, (in terms
      *         of number of integers).
@@ -243,13 +243,13 @@ namespace DB {
     static const int TXN_HEADER_SIZE;
 
     /**
-     * FTrie::FTrie
+     * FTree::FTree
      *
      * Default constructor. Made so private because this class is not intended
      * to be constructed on the stack or the heap, but is used to "add
      * structure" to pages returned by the Buffer Manager.
      */
-    FTrie() = default;
+    FTree() = default;
 
     NodeType type;
     int      count;
@@ -258,7 +258,7 @@ namespace DB {
     int      data[1];
 
     /**
-     * (private) FTrie::cmpKey
+     * (private) FTree::cmpKey
      *
      * Compare two keys using a lexicographic ordering.
      *
@@ -270,7 +270,7 @@ namespace DB {
     static int cmpKey(int *key1, int *key2, int width);
 
     /**
-     * (private) FTrie::findKey
+     * (private) FTree::findKey
      *
      * @param key Pointer to the key to search for.
      * @param from An index to start the search from (inclusive). This defaults
@@ -281,7 +281,7 @@ namespace DB {
     int findKey(int *key, int from = 0);
 
     /**
-     * (private) FTrie::findNewSlot
+     * (private) FTree::findNewSlot
      *
      * Like findKey, but looking through the NewSlot data structure for the slot
      * whose key is the smallest that is greater than or equal to the target.
@@ -293,7 +293,7 @@ namespace DB {
     int findNewSlot(const NewSlots &slots, int *key);
 
     /**
-     * (private) FTrie::findTxn
+     * (private) FTree::findTxn
      *
      * Like findKey, but looking through transactions for the transaction whose
      * key is the smallest that is greater than or equal to the target.
@@ -308,7 +308,7 @@ namespace DB {
     static int findTxn(int *txns, int width, int from, int *key);
 
     /**
-     * (private) FTrie::mergeTxns
+     * (private) FTree::mergeTxns
      *
      * Merge two sorted buffers of transactions.
      *
@@ -330,7 +330,7 @@ namespace DB {
                           int width);
 
     /**
-     * (private) FTrie::makeRoom
+     * (private) FTree::makeRoom
      *
      * Make a space of appropriate size at the given index to fit an extra
      * slot. This function does not make sure there is enough room.
@@ -341,14 +341,14 @@ namespace DB {
     void makeRoom(int index, int size = 1);
 
     /**
-     * (private) FTrie::capacity
+     * (private) FTree::capacity
      *
      * @return The number of slots this node can hold.
      */
     int capacity() const;
 
     /**
-     * (private) FTrie::slotSpace
+     * (private) FTree::slotSpace
      *
      * @return The number of integers available for new slots in the data
      *         segment.
@@ -356,7 +356,7 @@ namespace DB {
     int slotSpace() const;
 
     /**
-     * (private) FTrie:: txnSpacePerChild
+     * (private) FTree:: txnSpacePerChild
      *
      * The size (in number of integers) of the transaction buffer for a single
      * child node.
@@ -364,14 +364,14 @@ namespace DB {
     int txnSpacePerChild() const;
 
     /**
-     * (private) FTrie::txnsPerChild
+     * (private) FTree::txnsPerChild
      *
      * @return The number of transactions that can be stored per child node.
      */
     int txnsPerChild() const;
 
     /**
-     * (private) FTrie::stride
+     * (private) FTree::stride
      *
      * @return The size of a single slot, in number of integers.
      */

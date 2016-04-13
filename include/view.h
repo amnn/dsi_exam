@@ -2,7 +2,7 @@
 #define DB_VIEW_H
 
 #include "allocator.h"
-#include "ftrie.h"
+#include "ftree.h"
 
 namespace DB {
   /**
@@ -63,7 +63,7 @@ namespace DB {
     page_id mRootPID;
 
     // The root node is pinned to make batches of insertions faster:
-    FTrie * mTrie;
+    FTree * mTree;
 
     /**
      * (private) View::logTxn
@@ -74,7 +74,7 @@ namespace DB {
      * @param msg  The transaction type.
      * @param data The associated data buffer.
      */
-    void logTxn(FTrie::TxnType msg, int *data);
+    void logTxn(FTree::TxnType msg, int *data);
   };
 }
 

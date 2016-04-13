@@ -1,4 +1,4 @@
-#include "ftrie.h"
+#include "ftree.h"
 
 #include <cmath>
 #include <cstddef>
@@ -11,24 +11,24 @@
 #include "trie.h"
 
 namespace DB {
-  const int FTrie::SPACE  =
-    (Dim::PAGE_SIZE - offsetof(FTrie, data)) / sizeof(int);
+  const int FTree::SPACE  =
+    (Dim::PAGE_SIZE - offsetof(FTree, data)) / sizeof(int);
 
-  const int FTrie::SLOT_SPACE =
+  const int FTree::SLOT_SPACE =
     static_cast<int>(std::sqrt(SPACE));
 
-  const int FTrie::TXN_SPACE =
+  const int FTree::TXN_SPACE =
     SPACE - SLOT_SPACE;
 
-  const int FTrie::TXN_HEADER_SIZE =
+  const int FTree::TXN_HEADER_SIZE =
     offsetof(Transaction, data) / sizeof(int);
 
   page_id
-  FTrie::leaf(int width)
+  FTree::leaf(int width)
   {
     char *page;
     page_id lid = Global::BUFMGR->bnew(page);
-    FTrie *leaf = (FTrie *)page;
+    FTree *leaf = (FTree *)page;
 
     leaf->type  = Leaf;
     leaf->count = 0;
@@ -41,7 +41,7 @@ namespace DB {
   }
 
   page_id
-  FTrie::branch(int width, page_id leftPID, std::vector<int> slots)
+  FTree::branch(int width, page_id leftPID, std::vector<int> slots)
   {
     if (slots.empty())
       return leftPID;
@@ -51,7 +51,7 @@ namespace DB {
                                page_id prev = INVALID_PAGE) {
       char *  page;
       bid = Global::BUFMGR->bnew(page);
-      auto branch = (FTrie *)page;
+      auto branch = (FTree *)page;
 
       branch->type  = Branch;
       branch->count = 0;
@@ -98,23 +98,23 @@ namespace DB {
     }
 
     Global::BUFMGR->unpin(bid, true);
-    return FTrie::branch(width, leftPID, spillOver);
+    return FTree::branch(width, leftPID, spillOver);
   }
 
-  FTrie *
-  FTrie::load(page_id nid)
+  FTree *
+  FTree::load(page_id nid)
   {
-    return (FTrie *)Global::BUFMGR->pin(nid);
+    return (FTree *)Global::BUFMGR->pin(nid);
   }
 
-  FTrie::Diff
-  FTrie::flush(page_id nid, Family family, int *txns)
+  FTree::Diff
+  FTree::flush(page_id nid, Family family, int *txns)
   {
     Diff diff {.prop = PROP_NOTHING };
 
     int     t    = 0;   // Transaction waiting to be routed.
     page_id pid  = nid; // Currently pinned node.
-    FTrie * node = load(pid);
+    FTree * node = load(pid);
 
     // Cache some constants
     const int   TC  = txns[0];          // Transaction Count
@@ -305,7 +305,7 @@ namespace DB {
 
     if (family.sibs & LEFT_SIB) {
       page_id lid = node->prev;
-      FTrie *left = load(lid);
+      FTree *left = load(lid);
 
       if (!left->isUnderOccupied()) {
         Global::BUFMGR->unpin(lid);
@@ -323,7 +323,7 @@ namespace DB {
 
     if (family.sibs & RIGHT_SIB) {
       page_id rid  = node->next;
-      FTrie *right = load(rid);
+      FTree *right = load(rid);
 
       if (!right->isUnderOccupied()) {
         Global::BUFMGR->unpin(rid);
@@ -344,9 +344,9 @@ namespace DB {
   }
 
   void
-  FTrie::debugPrint(page_id nid)
+  FTree::debugPrint(page_id nid)
   {
-    FTrie *node = load(nid);
+    FTree *node = load(nid);
 
     std::cout << "========================================\n"
               << (node->type == Leaf ? "L" : "B") << nid << "("
@@ -403,7 +403,7 @@ namespace DB {
   }
 
   void
-  FTrie::debugPrintTxns(int *txns, int txnSize, int width)
+  FTree::debugPrintTxns(int *txns, int txnSize, int width)
   {
     int txnCount = txns[0];
 
@@ -419,7 +419,7 @@ namespace DB {
   }
 
   void
-  FTrie::debugPrintKey(int *key, int width)
+  FTree::debugPrintKey(int *key, int width)
   {
     std::cout << "(";
     for (int i = 0; i < width; ++i) {
@@ -430,12 +430,12 @@ namespace DB {
   }
 
   page_id
-  FTrie::split(page_id pid, int *key)
+  FTree::split(page_id pid, int *key)
   {
     // Allocate a new page
     char *page;
     page_id nid = Global::BUFMGR->bnew(page);
-    FTrie *node = (FTrie *)page;
+    FTree *node = (FTree *)page;
     node->type  = type;
     node->width = width;
 
@@ -482,7 +482,7 @@ namespace DB {
     next       = nid;
 
     if (node->next != INVALID_PAGE) {
-      FTrie *nbr = load(node->next);
+      FTree *nbr = load(node->next);
       nbr->prev = nid;
       Global::BUFMGR->unpin(node->next, true);
     }
@@ -492,7 +492,7 @@ namespace DB {
   }
 
   void
-  FTrie::merge(page_id nid, FTrie *that, int *part)
+  FTree::merge(page_id nid, FTree *that, int *part)
   {
     switch (type) {
     case Leaf:
@@ -522,34 +522,34 @@ namespace DB {
     next = that->next;
 
     if (next != INVALID_PAGE) {
-      FTrie *newNext = load(next);
+      FTree *newNext = load(next);
       newNext->prev = nid;
       Global::BUFMGR->unpin(next, true);
     }
   }
 
-  bool FTrie::isEmpty()           const { return count == 0; }
-  bool FTrie::isFull()            const { return count >= capacity(); }
-  bool FTrie::isUnderOccupied()   const { return count < capacity() / 2; }
+  bool FTree::isEmpty()           const { return count == 0; }
+  bool FTree::isFull()            const { return count >= capacity(); }
+  bool FTree::isUnderOccupied()   const { return count < capacity() / 2; }
 
-  NodeType FTrie::getType()       const { return type; }
+  NodeType FTree::getType()       const { return type; }
 
   int *
-  FTrie::slot(int index)
+  FTree::slot(int index)
   {
     int *start = type == Leaf ? data : data + 1;
     return start + stride() * index;
   }
 
   int *
-  FTrie::txns(int index)
+  FTree::txns(int index)
   {
     int *end = &data[0] + SPACE;
     return end - txnSpacePerChild() * (index + 1);
   }
 
   int
-  FTrie::cmpKey(int *key1, int *key2, int width)
+  FTree::cmpKey(int *key1, int *key2, int width)
   {
     for (int i = 0; i < width; ++i) {
       if      (key1[i] < key2[i]) return -1;
@@ -559,7 +559,7 @@ namespace DB {
   }
 
   int
-  FTrie::findKey(int *key, int from)
+  FTree::findKey(int *key, int from)
   {
     int lo = from, hi = count;
 
@@ -577,7 +577,7 @@ namespace DB {
   }
 
   int
-  FTrie::findNewSlot(const NewSlots &slots, int *key)
+  FTree::findNewSlot(const NewSlots &slots, int *key)
   {
     int lo = 0, hi = slots->size() / stride();
 
@@ -595,7 +595,7 @@ namespace DB {
   }
 
   int
-  FTrie::findTxn(int *txns, int width, int from, int *key)
+  FTree::findTxn(int *txns, int width, int from, int *key)
   {
     const int txnSize = TXN_HEADER_SIZE + width;
     int lo = from, hi = txns[0];
@@ -615,7 +615,7 @@ namespace DB {
   }
 
   int *
-  FTrie::mergeTxns(int *existing, int *incoming, int incCount, int width)
+  FTree::mergeTxns(int *existing, int *incoming, int incCount, int width)
   {
     const int txnSize     = TXN_HEADER_SIZE + width;
     const int byteTxnSize = txnSize * sizeof(int);
@@ -665,7 +665,7 @@ namespace DB {
   }
 
   void
-  FTrie::makeRoom(int index, int size)
+  FTree::makeRoom(int index, int size)
   {
     // Move slots
     memmove(slot(index + size), slot(index),
@@ -685,10 +685,10 @@ namespace DB {
     count += size;
   }
 
-  int FTrie::capacity() const { return slotSpace() / stride(); }
+  int FTree::capacity() const { return slotSpace() / stride(); }
 
   int
-  FTrie::slotSpace() const
+  FTree::slotSpace() const
   {
     switch (type) {
     case Leaf:
@@ -701,7 +701,7 @@ namespace DB {
   }
 
   int
-  FTrie::txnSpacePerChild() const
+  FTree::txnSpacePerChild() const
   {
     switch (type) {
     case Leaf:
@@ -715,7 +715,7 @@ namespace DB {
   }
 
   int
-  FTrie::txnsPerChild() const
+  FTree::txnsPerChild() const
   {
     return (txnSpacePerChild() - 1) / txnSize();
   }

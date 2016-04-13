@@ -3,24 +3,24 @@
 #include <cstring>
 
 #include "db.h"
-#include "ftrie.h"
+#include "ftree.h"
 #include "trie.h"
 
 namespace DB {
   View::View(int width)
     : mWidth   ( width )
-    , mRootPID ( FTrie::leaf(width) )
-    , mTrie    ( FTrie::load(mRootPID) )
+    , mRootPID ( FTree::leaf(width) )
+    , mTree    ( FTree::load(mRootPID) )
   {}
 
   View::~View()
   {
-    mTrie = nullptr;
+    mTree = nullptr;
     Global::BUFMGR->unpin(mRootPID);
   }
 
-  void View::insert(int *data) { logTxn(FTrie::Insert, data); }
-  void View::remove(int *data) { logTxn(FTrie::Delete, data); }
+  void View::insert(int *data) { logTxn(FTree::Insert, data); }
+  void View::remove(int *data) { logTxn(FTree::Delete, data); }
 
   void
   View::clear()
@@ -28,37 +28,37 @@ namespace DB {
   }
 
   void
-  View::logTxn(FTrie::TxnType msg, int *data)
+  View::logTxn(FTree::TxnType msg, int *data)
   {
     // Build a buffer containing a single transaction.
-    int *txns = new int[1 + mTrie->txnSize()]();
+    int *txns = new int[1 + mTree->txnSize()]();
     txns[0]   = 1;
-    auto txn  = (FTrie::Transaction *)&txns[1];
+    auto txn  = (FTree::Transaction *)&txns[1];
 
     txn->message = msg;
     memmove(txn->data, data, mWidth * sizeof(int));
 
-    auto diff = FTrie::flush(mRootPID, {.sibs = NO_SIBS}, txns);
+    auto diff = FTree::flush(mRootPID, {.sibs = NO_SIBS}, txns);
     delete[] txns;
 
     if (diff.prop == PROP_SPLIT) {
       Global::BUFMGR->unpin(mRootPID);
 
-      mRootPID = FTrie::branch(mWidth, mRootPID, *diff.newSlots);
-      mTrie    = FTrie::load(mRootPID);
+      mRootPID = FTree::branch(mWidth, mRootPID, *diff.newSlots);
+      mTree    = FTree::load(mRootPID);
 
       delete diff.newSlots;
-    } else if (mTrie->isEmpty()            &&
-               mTrie->getType()  == Branch &&
-               mTrie->txns(0)[0] == 0) {
+    } else if (mTree->isEmpty()            &&
+               mTree->getType()  == Branch &&
+               mTree->txns(0)[0] == 0) {
 
-      page_id newRoot = mTrie->slot(0)[-1];
+      page_id newRoot = mTree->slot(0)[-1];
 
       Global::BUFMGR->unpin(mRootPID);
       Global::BUFMGR->bfree(mRootPID);
 
       mRootPID = newRoot;
-      mTrie    = FTrie::load(mRootPID);
+      mTree    = FTree::load(mRootPID);
     }
   }
 }
