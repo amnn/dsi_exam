@@ -1,3 +1,89 @@
+\subsection{Assumptions}\label{sec:q-2-ass}
+
+The implementation makes use of the following assumptions and simplifications:
+
+\begin{itemize}
+  \item Updates are performed serially, so data structures are not thread-safe (no locks or transactions have been implemented).
+  \item There is no query parser, queries are built in code, and must be compiled before being run.
+  \item The database is transient. Although the database file persists after the program has finished running, the implementation does not keep track of a table directory, so the ID of each table's root page is lost. The next time the program is run, the database file is completely overwritten.
+  \item Tables, and query variables are referred to by numbers, not by strings. This is just to simplify encoding, and avoid having to keep track of maps to translate between human readable strings and unique numeric identifiers.
+\end{itemize}
+
+The implementation does \textit{not} assume that data-sets will fit into memory, and stores its data structures in a file on disk. The amount of RAM used by the implementation is artificially restricted to only ~8MB, in order to simulate scenarios in which the buffer manager would have to swap pages in and out from disk, but can be increased (see \texttt{POOL\_SIZE} in \texttt{README.md}), so that the system operates entirely in-memory.
+
+\subsection{File Structure}\label{sec:q-2-struct}
+
+Source files have been provided on USB and printed out and attached at the back of this script, below is an explanation of the overall structure of the project.
+
+\begin{description}
+  \item[\textnormal{\textbf{\texttt{README.md}}}] Instructions on how to build the binary, and run new queries.
+  \item[\textnormal{\texttt{bin/}}] Compiler's output directory for the linked executable.
+  \item[\textnormal{\texttt{data/}}] Contains CSV files describing the initial contents of relations $R_1,\ldots,R_4$, as well as the batches of transactions $I_1,\ldots,I_5$ and $D_1,\ldots,D_5$.
+  \item[\textnormal{\texttt{include/}}] Header files.
+  \item[\textnormal{\texttt{obj/}}] Compiler's output directory for object files.
+  \item[\textnormal{\texttt{report/}}] Source files for written report.
+  \item[\textnormal{\texttt{src/}}] Implementation files.
+\end{description}
+
+\subsection{Sub-Systems}\label{sec:q-2-class}
+
+\begin{description}
+  \item[Memory Management]
+    The \texttt{DB::Allocator}, \texttt{DB::BufMgr}, \texttt{DB::Frame} and \texttt{DB::Replacer} classes are, between them, responsible for managing the movement of data pages between main memory and disk. They have essentially the same structure as the components of the same names in the implementation of \textit{Minibase} we used in practical sessions, but they have been modified so that the allocator no longer keeps track of a directory, and the error mechanism has been replaced with C++'s standard exception-handling. This decision was made so that resource handling using constructors and destructors (The RAII pattern) could be implemented in an exception safe manner.
+
+  \item[Database Setup]
+    The \texttt{DB::Global} namespace (defined in \texttt{include/db.h}) contains globally visible pointers to an instance of \texttt{Allocator} and an instance of \texttt{BufMgr}, which can be used by any part of the implementation to manage its memory or otherwise load pages from disk. \texttt{DB::Dim}, similarly holds global constants that are used throughout the program (such as page size, buffer pool size, and number of pages in the database file).
+
+  \item[Data Structures]~\\
+    \begin{description}
+      \item[\textnormal{\texttt{DB::BTrie}}] Implementation of Nested B+-Tries, specialised to only contain records with two columns. Used to store input tables.
+      \item[\textnormal{\texttt{DB::FTree}}] Implementation of Fractal Tree Indices of arbitrary depth. Used to store the materialised view for the incremental equi-join.
+      \item[\textnormal{\texttt{DB::HeapFile}}] A transient heap file, storing data in a linked list of pages, supporting only append. This data structure is used by the na\"ive equi-join to materialise the view, because no extra work needs to be done to ensure that the view is sorted, as it is computed from scratch at every update.
+      \item[\textnormal{\texttt{DB::Table}}] A wrapper around \texttt{DB::BTrie} implementing the \texttt{\textbf{table}} interface from the algorithm section.
+      \item[\textnormal{\texttt{DB::View}}] A wrapper around \texttt{DB::FTree} implementing the \texttt{\textbf{view}} interface from the algorithm section.
+    \end{description}
+  \item[Iterators]~\\
+    \begin{description}
+      \item[\textnormal{\texttt{DB::TrieIterator}}] Specification of the \texttt{\textbf{iterator}} interface from the algorithm section, as an abstract class.
+      \item[\textnormal{\texttt{DB::BTrieIterator}}] Trie Iterator for scanning through the contents of an input table, stored in a nested B+-trie.
+      \item[\textnormal{\texttt{DB::SingletonIterator}}] Trie Iterator for a single record, used by the incremental algorithms to calculate the differential join (the join representing the records that changed as a result of an update). An implementation of Algorithm~\ref{alg:singleton-it}.
+      \item[\textnormal{\texttt{DB::LeapFrogTrieJoin}}] Implementation of the LeapFrog Trie-Join algorithm where the the input relations are given as Trie Iterators and the output is an un-materialised stream represented as another Trie Iterator. The owner of the join is free to choose where to materialise the result of the join to.
+    \end{description}
+  \item[Queries]~\\
+    \begin{description}
+      \item[\textnormal{\texttt{DB::Query}}] Abstract class representing the interface satisfied by all classes that implement some sort of incremental maintenance algorithm.
+      \item[\textnormal{\texttt{DB::NaiveQuery}}] Specialisation of \texttt{DB::Query} where the incremental maintenance is defined by just recomputing the result.
+      \item[\textnormal{\texttt{DB::NaiveCount}}] Incrementally maintains a count query by recomputing it at every iteration.
+      \item[\textnormal{\texttt{DB::NaiveEquiJoin}}] Incrementally maintains an equi-join query by recomputing it at every iteration.
+      \item[\textnormal{\texttt{DB::IncrementalCount}}] Incrementally maintains a count query by using the differential join for an update.
+      \item[\textnormal{\texttt{DB::IncrementalEquiJoin}}] Incrementally maintains an equi-join query by using the differential join for an update.
+      \item[\textnormal{\texttt{DB::TestBed}}] Runs batches of transactions on a query and keeps track of the time taken to propagate the update to the query result.
+    \end{description}
+\end{description}
+
 \subsection{Part (a)}\label{sec:q-2-a}
-\subsection{Part (b)}\label{sec:q-2-b}
-\subsection{Part (c)}\label{sec:q-2-c}
+
+An implementation of the queries from Question 1 Part (a) can be given by:
+
+\begin{verbatim}
+  DB::Query::Tables R {
+    {1, make_shared<DB::Table>(0, 1)},
+    {2, make_shared<DB::Table>(0, 2)},
+  };
+
+  R[1]->loadFromFile("data/R1.txt");
+  R[2]->loadFromFile("data/R2.txt");
+
+  DB::IncrementalEquiJoin query(3, R);
+  query.recompute();
+
+  DB::TestBed tb(query);
+  long time = tb.runFile(DB::Query::Insert, "data/I1.txt");
+  cout << time << " us elapsed." << endl;
+\end{verbatim}
+
+And in order to implement the incremental count query \texttt{DB::IncrementalEquiJoin~query(3,~R)} becomes \texttt{DB::IncrementalCount~query(3,~R)}.
+
+\subsection{Part (b/c)}\label{sec:q-2-bc}
+
+Algorithms~\ref{alg:up-trie-join-insert} and~\ref{alg:up-trie-join-delete} are implemented in the general case by \texttt{DB::IncrementalEquiJoin}, and similarly, Algorithms~\ref{alg:up-trie-count-insert} and~\ref{alg:up-trie-count-delete} are implemented by \texttt{DB::IncrementalCount}. These classes are supported by the others also mentioned above.
