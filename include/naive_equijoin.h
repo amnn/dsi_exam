@@ -35,17 +35,6 @@ namespace DB {
 
   private:
     HeapFile mResult;
-
-    /**
-     * (private) NaiveEquiJoin::scanIntoResult
-     *
-     * Scan the contents of the iterator into the result heap file.
-     *
-     * @param it     The iterator to scan through.
-     * @param recBuf A buffer storing the prefix of the record seen so far.
-     * @param depth  The depth to start filling from (defaults to 0).
-     */
-    void scanIntoResult(TrieIterator::Ptr &it, int *recBuf, int depth = 0);
   };
 }
 

@@ -24,32 +24,15 @@ namespace DB {
 
     // Pour it out into a result file.
     int *recBuf = new int[getWidth()]();
-    scanIntoResult(query, recBuf);
-    delete[] recBuf;
-  }
-
-  void
-  NaiveEquiJoin::scanIntoResult(std::unique_ptr<TrieIterator> &it,
-                                int *recBuf, int depth)
-  {
-    if (depth >= getWidth()) {
-
+    TrieIterator::traverse(query, getWidth(), recBuf, [this, recBuf] {
 #ifdef DEBUG
-      for (int i = 0; i < getWidth(); ++i)
-        std::cout << recBuf[i] << " ";
-      std::cout << std::endl;
+        for (int i = 0; i < getWidth(); ++i)
+          std::cout << recBuf[i] << " ";
+        std::cout << std::endl;
 #endif
 
-      mResult.append(recBuf, getWidth());
-      return;
-    }
-
-    it->open();
-    while (!it->atEnd()) {
-      recBuf[depth] = it->key();
-      scanIntoResult(it, recBuf, depth + 1);
-      it->next();
-    }
-    it->up();
+        mResult.append(recBuf, getWidth());
+      });
+    delete[] recBuf;
   }
 }
