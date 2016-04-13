@@ -38,7 +38,7 @@ namespace DB {
      * Table::loadFromFile
      *
      * Insert data into the table from a file. The file should be
-     * reaad-accessible to the database, and the format should be CSV with one
+     * read-accessible to the database, and the format should be CSV with one
      * record (two columns) per line.
      *
      * @param fname The name of the file to load from

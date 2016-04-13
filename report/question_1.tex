@@ -509,9 +509,7 @@ As before, when maintaining an equijoin query, Na\"iveDB performs a merge over a
 \begin{align*}
   &\textit{Equijoin} && O(m(P_V + kP_k)) &&\\
   &\textit{Count}    && O(mkP_k) &&
-\end{align*}
-On the other hand, IncDB will scan all but one of the tables, which in the worst-case will involve $kP_k-P_1$ IO's. The cost to updating the remains the same, however.
-\begin{align*}
+  \intertext{On the other hand, IncDB will scan all but one of the tables, which in the worst-case will involve $kP_k-P_1$ IO's. The cost to updating the remains the same, however.}
   &\textit{Equijoin} && O\left(m(kP_k-P_1) + \frac{T\log_B(P_V)}{\sqrt{B}}\right) &&\\
   &\textit{Count}    && O(m(kP_k-P_1)) &&
 \end{align*}
