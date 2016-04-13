@@ -36,7 +36,7 @@ And when $t\notin R_1$, we have
   \step[\imps] $\abs{(R_1\setminus\{t\})\bowtie R_2} = \abs{R_1\bowtie R_2}$
 \end{itemize}
 
-From these results we see that (a) If the operation is redundant, then the query result does not need to be altered, and (b) If ther operation is not redundant, we may compute a much smaller join (as in the hint) and use that to update the query result. In the case of \texttt{COUNT} queries, this means we do not need to materialise the join, but instead may keep a running total.
+From these results we see that (a) If the operation is redundant, then the query result does not need to be altered, and (b) If the operation is not redundant, we may compute a much smaller join (as in the hint) and use that to update the query result. In the case of \texttt{COUNT} queries, this means we do not need to materialise the join, but instead may keep a running total.
 
 The pseudo-code that follows will be written in terms of the interfaces, given in Figures \ref{iface:table}, \ref{iface:iterator} and \ref{iface:view}.
 
@@ -166,7 +166,6 @@ And then we serve each update as in Algorithms~\ref{alg:up-join-insert} and~\ref
       $S_2\gets $\Scan{}\;
       \Seek{a}\;
       \While{$\Key{} = a\wedge\Not~\AtEnd{}$}{
-        $(a^\prime,c)\gets $\Get{}\;
         $C\gets C + 1$\;
         \Next{}\;
       }
@@ -191,8 +190,7 @@ And then we serve each update as in Algorithms~\ref{alg:up-join-insert} and~\ref
       $S_2\gets $\Scan{}\;
       \Seek{a}\;
       \While{$\Key{} = a\wedge\Not~\AtEnd{}$}{
-        $(a^\prime,c)\gets $\Get{}\;
-        $C\gets C + 1$\;
+        $C\gets C - 1$\;
         \Next{}\;
       }
     }
@@ -244,7 +242,7 @@ An incremental approach incurs the following costs:
 \begin{itemize}
   \item For each update to one table, we will scan the other table to find corresponding records. In the worst case this would take $P_2$ IO's.
   \item For each of the corresponding records, we issue a transaction. To minimise the number of times we write the root node of the view back, we pin it.
-  \item Whenever we flush a transaction buffer, it is because we have more than $\frac{B - \sqrt{B}}{\sqrt{B}}=O(\sqrt{B})$ transactions waiting --- this follows because we only flush when the transaction buffer is full. A single flush costs $1$ IO, so the amortized cost per transaction is $\frac{1}{\sqrt{B}}$.
+  \item Whenever we flush a transaction buffer, it is because we have more than $\frac{B - \sqrt{B}}{\sqrt{B}}=O(\sqrt{B})$ transactions waiting --- this follows because we only flush when the transaction buffer is full. A single flush costs $1$ IO, so the amortized cost per transaction is $O(\frac{1}{\sqrt{B}})$.
   \item Each transaction we add will be flushed at most $2\log_B(P_V)$ times.
   \item $mP_2$ IO's are spent scanning.
   \item $\frac{2T\log_B(P_V)}{\sqrt{B}}$ IO's are spent flushing transactions.
