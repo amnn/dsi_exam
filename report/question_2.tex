@@ -6,7 +6,9 @@ The implementation makes use of the following assumptions and simplifications:
   \item Updates are performed serially, so data structures are not thread-safe (no locks or transactions have been implemented).
   \item There is no query parser, queries are built in code, and must be compiled before being run.
   \item The database is transient. Although the database file persists after the program has finished running, the implementation does not keep track of a table directory, so the ID of each table's root page is lost. The next time the program is run, the database file is completely overwritten.
-  \item Tables, and query variables are referred to by numbers, not by strings. This is just to simplify encoding, and avoid having to keep track of maps to translate between human readable strings and unique numeric identifiers.
+  \item Tables, and query variables are referred to by numbers, not by strings. This simplifies encoding, and avoids having to keep track of maps to translate between human readable strings and unique numeric identifiers.
+  \item Records in the join do not contain duplicates: Every query variable corresponds to a single column in the result, so the result of $R_1(A,B)\bowtie R_2(A,C)$ will contain only three columns $\langle A, B, C\rangle$, as opposed to $\langle A, B, A, C\rangle$ which would correspond to the concatenation of records from $R_1$ and $R_2$.
+  \item The order of columns in the result (from left to right) is derived from the order of query variables according to their numeric identifiers (in ascending order).
 \end{itemize}
 
 The implementation does \textit{not} assume that data-sets will fit into memory, and stores its data structures in a file on disk. The amount of RAM used by the implementation is artificially restricted to only ~8MB, in order to simulate scenarios in which the buffer manager would have to swap pages in and out from disk, but can be increased (see \texttt{POOL\_SIZE} in \texttt{README.md}), so that the system operates entirely in-memory.
