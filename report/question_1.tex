@@ -215,6 +215,176 @@ Using a Fractal Tree Index improves the amortized cost of serving a sequence of 
 
 \subsection{Part (a.ii)}\label{sec:q-1-a-ii}
 
+In the worked examples to follow, rectangular nodes represent the intermediate and leaf nodes of the tree, whilst nodes with rounded corners represent transaction buffers, and are part of their parent nodes. To differentiate between B+-trees and Fractal Trees, the former use solid edges, whilst the latter use dashed edges, labeled by the corresponding transaction buffer.\\[1em]
+
+In leaf nodes $\times$ is used to denote an empty slot, whilst empty slots are omitted from branch nodes, and $\varnothing$ is used to denote an empty transaction buffer. Whenever an entry in a nodes appears to break an invariant of the data structure, it will be formatted \textbf{\textcolor{red}{red and in bold}}.\\[1em]
+
+For the purposes of these examples, we will say that all leaf nodes may hold 4 records, the branch nodes of B+-trees will have a fan-out of 5 (4 pivot keys), and the branch nodes of Fractal Trees will have a fan-out of 3 (2 pivot keys), and a transaction buffer fitting one transaction per child.
+
+\begin{align*}
+  \text{Suppose}\quad R_1 & = \{(2i,1):1\leq i\leq 8\}
+  \\                  R_2 & = \{(4i,2), (4i,3) : 1\leq i\leq 4\}
+\end{align*}
+
+\vspace{2mm}
+
+\begin{center}
+  \marginnote{First we load data into the B+-tree for $R_1$.}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=40mm]
+
+    \node {$8$} [->]
+    child {node {$2,1$ \nodepart{two} $4,1$ \nodepart{three} $6,1$ \nodepart{four} $8,1$}}
+    child {node {$10,1$ \nodepart{two} $12,1$ \nodepart{three} $14,1$ \nodepart{four} $16,1$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\begin{center}
+  \marginnote{And the B+-tree for $R_2$.}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=40mm]
+
+    \node {$8$} [->]
+    child {node {$4,2$ \nodepart{two} $4,3$ \nodepart{three} $8,2$ \nodepart{four} $8,3$}}
+    child {node {$12,2$ \nodepart{two} $12,3$ \nodepart{three} $16,2$ \nodepart{four} $16,3$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{We build the initial view using LeapFrog Trie-Join, which gives us the records $(4,1,2)$, $(4,1,3)$, $(8,1,2)$, $(8,1,3)$, $(12,1,2)$, $(12,1,3)$, $(16,1,2)$, $(16,1,3)$ to insert into the Fractal Tree.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node {$8$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$ \nodepart{two} $12,1,2$ \nodepart{three} $12,1,3$ \nodepart{four} $16,1,2$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$+(16,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Now suppose we perform $+R_1(4,2)$, updating $R_1$'s B+-tree.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=35mm]
+
+    \node {$4$\nodepart{two}$8$} [->]
+    child {node {$2,1$ \nodepart{two} $4,1$ \nodepart{three} $4,2$ \nodepart{four} $\times$}}
+    child {node {$6,1$ \nodepart{two} $8,1$ \nodepart{three} $\times$ \nodepart{four} $\times$}}
+    child {node {$10,1$ \nodepart{two} $12,1$ \nodepart{three} $14,1$ \nodepart{four} $16,1$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\marginnote{We seek for $4$ in $R_2$, finding $(4,2)$,$(4,3)$, and causing us to insert $(4,2,2)$,$(4,2,3)$ into the view.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw,fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=60mm]
+
+    \node {$8$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle split parts=2,rectangle split horizontal, rectangle split ignore empty parts,rounded corners=7pt] {$+(4,2,2)$\nodepart{two}\textcolor{red}{$\mathbf{+(4,2,3)}$}}}
+    child {node {$8,1,3$ \nodepart{two} $12,1,2$ \nodepart{three} $12,1,3$ \nodepart{four} $16,1,2$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$+(16,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{We flush the overfull transaction buffer.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw,fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=60mm]
+
+    \node {$8$} [->]
+    child {node[rectangle split parts=5] {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $4,2,2$ \nodepart{four} $4,2,3$ \nodepart{five} \textcolor{red}{$\mathbf{8,1,2}$}} edge from parent[dashed] node[solid,rectangle, rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node[] {$8,1,3$ \nodepart{two} $12,1,2$ \nodepart{three} $12,1,3$ \nodepart{four} $16,1,2$} edge from parent[dashed] node[solid,rectangle, rounded corners=7pt,fill=white,draw] {$+(16,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Flushing the transaction buffer caused the leaf node to overfill, so we split that too.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw,fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=45mm]
+
+    \node {$4$\nodepart{two}$8$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $4,2,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$4,2,3$ \nodepart{two} $8,1,2$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node[] {$8,1,3$ \nodepart{two} $12,1,2$ \nodepart{three} $12,1,3$ \nodepart{four} $16,1,2$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$+(16,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Then suppose we perform $-R_1(16, 1)$}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=35mm]
+
+    \node {$4$\nodepart{two}$8$} [->]
+    child {node {$2,1$ \nodepart{two} $4,1$ \nodepart{three} $4,2$ \nodepart{four} $\times$}}
+    child {node {$6,1$ \nodepart{two} $8,1$ \nodepart{three} $\times$ \nodepart{four} $\times$}}
+    child {node {$10,1$ \nodepart{two} $12,1$ \nodepart{three} $14,1$ \nodepart{four} $\times$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Seeking for $16$ in $R_2$, we find $(16, 2)$, $(16, 3)$, causing us to delete $(16, 1, 2)$ and $(16, 1, 3)$.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw,fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node {$4$\nodepart{two}$8$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $4,2,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$4,2,3$ \nodepart{two} $8,1,2$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$ \nodepart{two} $12,1,2$ \nodepart{three} $12,1,3$ \nodepart{four} $16,1,2$} edge from parent[dashed] node[solid,rectangle split parts=2,rectangle split horizontal, rectangle split ignore empty parts,rounded corners=7pt] {$+(16,1,2)$\nodepart{two}\textcolor{red}{$\mathbf{+(16,1,3)}$}}}
+    ;\end{tikzpicture}
+\end{center}
+
+\marginnote{The overfull transaction buffer is flushed.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw,fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=40mm]
+
+    \node {$4$\nodepart{two}$8$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $4,2,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$4,2,3$ \nodepart{two} $8,1,2$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$ \nodepart{two} $12,1,2$ \nodepart{three} $12,1,3$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    ;\end{tikzpicture}
+\end{center}
+
+If instead we are preserving a count query, given the same updates:
+
+\begin{align*}
+  &            && \phantom{+2~}\text{ Initially } & C & = 8 \\
+  & +R_1(4,2)  && +2\text{ records }\implies      & C & = 10 \\
+  & -R_1(16,1) && -2\text{ records }\implies      & C & = 8
+\end{align*}
+
 \subsection{Part (a.iii)}\label{sec:q-1-a-iii}
 We will use the IO Model to measure performance, counting the number of page reads and writes required for each operation, in the worst-case.
 
