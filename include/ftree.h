@@ -11,7 +11,7 @@ namespace DB {
   /**
    * FTree
    *
-   * Implementation of Nested Fractial Trees. Unlike the Nested B+ Trie
+   * Implementation of Nested Fractal Trees. Unlike the Nested B+ Trie
    * implementation, this one handles arbitrary depth, and relies solely upon
    * splitting and merging to maintain balance (no redistribution).
    *
@@ -245,9 +245,9 @@ namespace DB {
     /**
      * FTree::FTree
      *
-     * Default constructor. Made so private because this class is not intended
-     * to be constructed on the stack or the heap, but is used to "add
-     * structure" to pages returned by the Buffer Manager.
+     * Default constructor. Made private because this class is not intended to
+     * be constructed on the stack or the heap, but is used to "add structure"
+     * to pages returned by the Buffer Manager.
      */
     FTree() = default;
 
