@@ -359,7 +359,7 @@ For the purposes of these examples, we will say that all leaf nodes may hold 4 r
     \node {$4$\nodepart{two}$8$} [->]
     child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $4,2,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
     child {node {$4,2,3$ \nodepart{two} $8,1,2$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
-    child {node {$8,1,3$ \nodepart{two} $12,1,2$ \nodepart{three} $12,1,3$ \nodepart{four} $16,1,2$} edge from parent[dashed] node[solid,rectangle split parts=2,rectangle split horizontal, rectangle split ignore empty parts,rounded corners=7pt] {$+(16,1,2)$\nodepart{two}\textcolor{red}{$\mathbf{+(16,1,3)}$}}}
+    child {node {$8,1,3$ \nodepart{two} $12,1,2$ \nodepart{three} $12,1,3$ \nodepart{four} $16,1,2$} edge from parent[dashed] node[solid,rectangle split parts=2,rectangle split horizontal, rectangle split ignore empty parts,rounded corners=7pt] {$-(16,1,2)$\nodepart{two}\textcolor{red}{$\mathbf{-(16,1,3)}$}}}
     ;\end{tikzpicture}
 \end{center}
 
@@ -657,9 +657,297 @@ The materialised view data structure remains mostly unchanged, although now, the
 
 We transform the representation of input tables in a similar manner, so that they are stored in indices keyed on all of their columns. However, we choose a different tactic to the one we employed for the view here: We nest indices. Let $R(a, b)$ be an input table with its columns having positions in the global ordering $p_a\prec p_b$ respectively, then the index representing $R$ begins (at the root) as an index keyed on $a$, at whose leaves are indices keyed on $b$. We do this because it mirrors the trie representation that we must expose through the \texttt{iterator} interface, and in doing so improves the performance of trie operations. The down-side is that as we nest indices deeper and deeper, we may waste space. For example, in the worst-case, suppose $a$ is a primary key for the relation, then we will end up allocating an entire page (the leaf node for the $b$-keyed index) for each record. As we are nesting only one layer deep, however, this sparsity in the leaves will be manageable.\\[1em]
 
-(WORKED EQUIJOIN EXAMPLE)\\[1em]
+For the worked example, we use the same notation as in Part (a.ii), although the data structures have changed and now we are maintaining a view of the triangle join: $R_1(A,B)\bowtie R_2(A,C)\bowtie R_3(B,C)$:
+\begin{align*}
+  \text{Let}\quad R_1 & = \{(2i,1):1\leq i\leq 8\}
+  \\              R_2 & = \{(4i,2), (4i,3) : 1\leq i\leq 4\}
+  \\              R_3 & = \{(1,2)\}
+\end{align*}
 
-(WORKED COUNT EXAMPLE)\\[1em]
+\vspace{2mm}
+
+\begin{center}
+  \scalebox{.7}{
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=90mm]
+    \tikzstyle{level 2}=[sibling distance=22mm]
+
+    \node {$8$} [->]
+    child {node {$2$ \nodepart{two} $4$ \nodepart{three} $6$ \nodepart{four} $8$}
+      child {node {$1$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+      child {node {$1$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+      child {node {$1$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+      child {node {$1$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    }
+    child {node {$10$ \nodepart{two} $12$ \nodepart{three} $14$ \nodepart{four} $16$}
+      child {node {$1$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+      child {node {$1$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+      child {node {$1$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+      child {node {$1$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    }
+    ;\end{tikzpicture}}
+  \marginnote{First we load data into the Nested B+-trie for $R_1$.}
+\end{center}
+
+\vspace{5mm}
+
+\begin{center}
+  \marginnote{And the Nested B+-trie for $R_2$.}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=25mm]
+
+    \node {$4$\nodepart{two}$8$\nodepart{three}$12$\nodepart{four}$16$} [->]
+    child {node {$2$\nodepart{two}$3$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    child {node {$2$\nodepart{two}$3$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    child {node {$2$\nodepart{two}$3$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    child {node {$2$\nodepart{two}$3$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\begin{center}
+  \marginnote{And for $R_3$.}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=25mm]
+
+    \node {$1$} [->]
+    child {node {$2$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{The initial result of the join consists of $(4,1,2$, $(8,1,2)$, $(12,1,2)$, $(16,1,2)$, which will fit into a single leaf node in the Fractal Tree Index.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node {$4,1,2$\nodepart{two}$8,1,2$\nodepart{three}$12,1,2$\nodepart{four}$16,1,2$} [->]
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\begin{center}
+  \marginnote{Suppose $+R_3(1,3)$.}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=25mm]
+
+    \node {$1$} [->]
+    child {node {$2$\nodepart{two}$3$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Calculating the differential join, we find we must insert $(4,1,3)$, $(8,1,3)$, $(12,1,3)$, $(16,1,3)$. We start with $(4,1,3)$.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node[rectangle split parts=5]{$4,1,2$\nodepart{two}$4,1,3$\nodepart{three}$8,1,2$\nodepart{four}$12,1,2$\nodepart{five}\textcolor{red}{$\mathbf{16,1,2}$}} [->]
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{The leaf was overfull, so we split it.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$12,1,2$ \nodepart{two} $16,1,2$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Inserting $(8,1,3)$ now just involves adding it to the transaction buffer.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$12,1,2$ \nodepart{two} $16,1,2$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$+(8,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Next we insert $(12,1,3)$.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$12,1,2$ \nodepart{two} $16,1,2$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rectangle split,rectangle split parts=2,rounded corners=7pt,fill=white,draw] {$+(8,1,3)$\nodepart{two}\textcolor{red}{$\mathbf{+(12,1,3)}$}}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{The transaction buffer is now too full, so it is flushed.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$\nodepart{two}$12,1,2$\nodepart{three}$12,1,3$\nodepart{four}$16,1,2$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Finally we insert $(16,1,3)$ which once again sits in the transaction buffer, avoiding the split of the (full) node it will eventually go to.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$\nodepart{two}$12,1,2$\nodepart{three}$12,1,3$\nodepart{four}$16,1,2$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$+(16,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\begin{center}
+  \marginnote{Now suppose we do $-R_3(1,2)$.}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=25mm]
+
+    \node {$1$} [->]
+    child {node {$3$\nodepart{two}$\times$\nodepart{three}$\times$\nodepart{four}$\times$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{As a result we must remove $(4,1,2)$,$(8,1,2)$,$(12,1,2)$,$(16,1,2)$. We start with $(4,1,2)$.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=50mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$-(4,1,2)$}}
+    child {node {$8,1,3$\nodepart{two}$12,1,2$\nodepart{three}$12,1,3$\nodepart{four}$16,1,2$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$+(16,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Then $(8,1,2)$.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=55mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,2$ \nodepart{two} $4,1,3$ \nodepart{three} $8,1,2$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rectangle split,rectangle split parts=2,rounded corners=7pt,fill=white,draw] {$-(4,1,2)$\nodepart{two}\textcolor{red}{$\mathbf{-(8,1,2)}$}}}
+    child {node {$8,1,3$\nodepart{two}$12,1,2$\nodepart{three}$12,1,3$\nodepart{four}$16,1,2$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$+(16,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{We flush the overfull transaction buffer. (Note, we do not merge the node with its neighbour, as they are not \textit{both} under-occupied.)}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=55mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,3$ \nodepart{two} $\times$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$\nodepart{two}$12,1,2$\nodepart{three}$12,1,3$\nodepart{four}$16,1,2$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$+(16,1,3)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Node $(12,1,2)$.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=55mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,3$ \nodepart{two} $\times$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$\nodepart{two}$12,1,2$\nodepart{three}$12,1,3$\nodepart{four}$16,1,2$} edge from parent[dashed] node[solid,rectangle,rectangle split,rectangle split parts=2,rounded corners=7pt,fill=white,draw] {$-(12,1,2)$\nodepart{two}\textcolor{red}{$\mathbf{+(16,1,3)}$}}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Which causes a flush.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=55mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,3$ \nodepart{two} $\times$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$\nodepart{two}$12,1,3$\nodepart{three}$16,1,2$\nodepart{four}$16,1,3$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    ;\end{tikzpicture}
+\end{center}
+
+\vspace{5mm}
+
+\marginnote{Finally $(16,1,2)$.}
+\begin{center}
+  \begin{tikzpicture}
+    \tikzstyle{bplus}=[rectangle split, rectangle split horizontal,rectangle split ignore empty parts,draw, fill=white]
+    \tikzstyle{every node}=[bplus]
+    \tikzstyle{level 1}=[sibling distance=55mm]
+
+    \node{$8,1,2$} [->]
+    child {node {$4,1,3$ \nodepart{two} $\times$ \nodepart{three} $\times$ \nodepart{four} $\times$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$\varnothing$}}
+    child {node {$8,1,3$\nodepart{two}$12,1,3$\nodepart{three}$16,1,2$\nodepart{four}$16,1,3$} edge from parent[dashed] node[solid,rectangle,rounded corners=7pt,fill=white,draw] {$-(16,1,2)$}}
+    ;\end{tikzpicture}
+\end{center}
+
+Likewise, preserving a count query:
+
+\begin{align*}
+  &           && \phantom{+4~}\text{ Initially } & C & = 4 \\
+  & +R_3(1,3) && +4\text{ records }\implies      & C & = 8 \\
+  & -R_4(1,2) && -4\text{ records }\implies      & C & = 4
+\end{align*}
 
 \begin{flalign*}
   \intertext{Now, we turn our attention to performance analysis, and as before, we begin with some definitions.}
