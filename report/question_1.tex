@@ -511,8 +511,8 @@ Finally, we add a function \texttt{singleton(i, x, j, y\,:\,int)\,:\,iterator}, 
       }
       \BlankLine
       \Fn{$it$.\Next{}}{
-        $\mathit{done_i}\gets\mathit{done_i}\vee\mathit{depth}=i$\;
-        $\mathit{done_j}\gets\mathit{done_j}\vee\mathit{depth}=j$\;
+        $\mathit{done_i}\gets\mathit{done_i}~\vee~\mathit{depth}=i$\;
+        $\mathit{done_j}\gets\mathit{done_j}~\vee~\mathit{depth}=j$\;
       }
       \BlankLine
       \Fn{$it$.\Seek{key}}{
@@ -544,7 +544,7 @@ Finally, we add a function \texttt{singleton(i, x, j, y\,:\,int)\,:\,iterator}, 
   \caption{Function to produce a singleton relation $\{(x, y)\}$ exposed through the \texttt{iterator} interface.}\label{alg:singleton-it}
 \end{algorithm}
 
-Once again, W.l.o.g. we assume that all our updates are for $R_1$, and furthermore, $R_1$'s columns appear at positions $p_1$ and $p_2$ respectively, in the global ordering. Our outer loop remains unchanged (Algorithm~\ref{alg:up-loop}), but we rephrase our update routines in terms of an implementation of the Trie-Join algorithm \cite{DBLP:journals/corr/abs-1210-0481}. We omit the algorithm here as it is available at the cited paper, but assume it is available as \texttt{trie-join(its\,:\,[iterator])\,:\,iterator}. Algorithms~\ref{alg:up-trie-join-insert} and~\ref{alg:up-trie-join-delete} give the new update routines for equijoin queries, and Algorithms~\ref{alg:up-trie-count-insert} and~\ref{alg:up-trie-count-delete} are the new update routiens for count queries.\\[1em]
+Once again, W.l.o.g. we assume that all our updates are for $R_1$, and furthermore, $R_1$'s columns appear at positions $p_1$ and $p_2$ respectively, in the global ordering. Our outer loop remains unchanged (Algorithm~\ref{alg:up-loop}), but we rephrase our update routines in terms of an implementation of the Trie-Join algorithm \cite{DBLP:journals/corr/abs-1210-0481}. We omit the algorithm here as it is available at the cited paper, but assume it is available as \texttt{trie-join(its\,:\,[iterator])\,:\,iterator}. Algorithms~\ref{alg:up-trie-join-insert} and~\ref{alg:up-trie-join-delete} give the new update routines for equijoin queries, and Algorithms~\ref{alg:up-trie-count-insert} and~\ref{alg:up-trie-count-delete} are the new update routines for count queries.\\[1em]
 
 \begin{algorithm}
   \SetKwProg{Fn}{func}{}{}
@@ -624,7 +624,7 @@ Once again, W.l.o.g. we assume that all our updates are for $R_1$, and furthermo
       }
       \Traverse{$J$, $v$, $r$, \Act, $0$}\;
     }
-  \caption{Updating a Count query after an insertion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-trie-count-insert}
+  \caption{Updating a Count query after an insertion, assuming \texttt{C\,:\,int} holds the current result, and $v$ is the number of variables in the query.}\label{alg:up-trie-count-insert}
 \end{algorithm}
 \begin{algorithm}
   \SetKwProg{Fn}{func}{}{}
@@ -650,7 +650,7 @@ Once again, W.l.o.g. we assume that all our updates are for $R_1$, and furthermo
       }
       \Traverse{$J$, $v$, $r$, \Act, $0$}\;
     }
-  \caption{Updating a Count query after a deletion, assuming \texttt{C\,:\,int} holds the current result.}\label{alg:up-trie-count-delete}
+  \caption{Updating a Count query after a deletion, assuming \texttt{C\,:\,int} holds the current result, and $v$ is the number of variables in the query.}\label{alg:up-trie-count-delete}
 \end{algorithm}
 
 The materialised view data structure remains mostly unchanged, although now, the index is keyed on \textit{all} columns in the result, with the order being given by the global ordering, this is done in the usual way, whereby at each intermediate node, partitioning ``keys'' are in fact entire partitioning \textit{records}.\\[1em]
@@ -946,26 +946,16 @@ Likewise, preserving a count query:
 \begin{align*}
   &           && \phantom{+4~}\text{ Initially } & C & = 4 \\
   & +R_3(1,3) && +4\text{ records }\implies      & C & = 8 \\
-  & -R_4(1,2) && -4\text{ records }\implies      & C & = 4
+  & -R_3(1,2) && -4\text{ records }\implies      & C & = 4
 \end{align*}
 
-\begin{flalign*}
-  \intertext{Now, we turn our attention to performance analysis, and as before, we begin with some definitions.}
-  \text{Let}\quad m & = \text{ Number of updates to deal with.} &&\\
-  P_i & = \text{ Number of pages in }R_i &&\\
-  P_V & = \text{ Number of pages in the materialised view.} &&\\
-  T & = \text{ The total number of records added/removed from the view.} &&\\
-  B & = \text{ Branch factor of the B+-tree.} &&\\
-  \sqrt{B} & = \text{ Branch factor of the Fractal Tree.} &&\\
-  B - \sqrt{B} & = \text{ Total size of the transaction buffer (shared amongst children).} &&\\
-  \frac{B - \sqrt{B}}{\sqrt{B}} & = \text{ Size of transaction buffer allocated per child.} &&
-  \intertext{W.l.o.g. let $P_1\leq P_2\leq\cdots\leq P_k$.}
-\end{flalign*}
-As before, when maintaining an equijoin query, Na\"iveDB performs a merge over all tables, which in the worst-case will involve scanning all the tables:
+Now, we turn our attention to performance analysis. We will use the same definitions as in Part (a.iv), but generalised so that now $P_i = \#\text{Pages in }R_i$. W.l.o.g. $P_1\leq P_2\leq\cdots\leq P_k$.\\[1em]
+
+As before, when maintaining an equijoin query, Na\"iveDB performs a merge over all tables, which in the worst-case will involve scanning them all:
 \begin{align*}
   &\textit{Equijoin} && O(m(P_V + kP_k)) &&\\
   &\textit{Count}    && O(mkP_k) &&
-  \intertext{On the other hand, IncDB will scan all but one of the tables, which in the worst-case will involve $kP_k-P_1$ IO's. The cost to updating the remains the same, however.}
+  \intertext{On the other hand, IncDB will scan all but one of the tables, which in the worst-case will involve $kP_k-P_1$ IO's. The update cost remains the same, however.}
   &\textit{Equijoin} && O\left(m(kP_k-P_1) + \frac{T\log_B(P_V)}{\sqrt{B}}\right) &&\\
   &\textit{Count}    && O(m(kP_k-P_1)) &&
 \end{align*}
