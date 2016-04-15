@@ -1,4 +1,4 @@
-This design is based on LeapFrog Trie-Join (CITATION: Veldhuizen 2013) and Fractal Tree Indices, as implemented by \textit{TokuDB}. We differentiate from each of these by:
+This design is based on LeapFrog Trie-Join\cite{DBLP:journals/corr/abs-1210-0481} and Fractal Tree Indices, as implemented by \textit{TokuDB}\cite{kuszmaul2009fractal}. We differentiate from each of these by:
 \begin{itemize}
   \item Combining their disparate techniques.
   \item Adapting LeapFrog Trie-Join for use in the incremental setting.
@@ -443,7 +443,7 @@ Firstly, we require that there is a global ordering of variables --- of which th
   \caption{Additions to the iterator interface, making it a trie iterator.}\label{iface:trie-iterator}
 \end{marginfigure}
 
-Secondly, we augment the iterator interface (Figure~\ref{iface:trie-iterator}), to descend and ascend levels in the trie representation of tables (CITATION). If a trie has no values at a given level (the table it is representing is not participating in the join over this query variable) then the trie will return $-\infty$ for the key.\\[1em]
+Secondly, we augment the iterator interface (Figure~\ref{iface:trie-iterator}), to descend and ascend levels in the trie representation of tables\cite{DBLP:journals/corr/abs-1210-0481}. If a trie has no values at a given level (the table it is representing is not participating in the join over this query variable) then the trie will return $-\infty$ for the key.\\[1em]
 
 With the introduction of this trie representation, \texttt{I.get()} becomes redundant: Consumers of iterators may keep track of the current prefix of the record they are traversing as they move up and down the trie by making calls to \texttt{I.key()}. We provide a higher order function --- \texttt{traverse} --- to capture this notion (Algorithm~\ref{alg:traverse}).\\[1em]
 
@@ -544,7 +544,7 @@ Finally, we add a function \texttt{singleton(i, x, j, y\,:\,int)\,:\,iterator}, 
   \caption{Function to produce a singleton relation $\{(x, y)\}$ exposed through the \texttt{iterator} interface.}\label{alg:singleton-it}
 \end{algorithm}
 
-Once again, W.l.o.g. we assume that all our updates are for $R_1$, and furthermore, $R_1$'s columns appear at positions $p_1$ and $p_2$ respectively, in the global ordering. Our outer loop remains unchanged (Algorithm~\ref{alg:up-loop}), but we rephrase our update routines in terms of an implementation of the Trie-Join algorithm (CITATION). We omit the algorithm here as it is available at the cited paper, but assume it is available as \texttt{trie-join(its\,:\,[iterator])\,:\,iterator}. Algorithms~\ref{alg:up-trie-join-insert} and~\ref{alg:up-trie-join-delete} give the new update routines for equijoin queries, and Algorithms~\ref{alg:up-trie-count-insert} and~\ref{alg:up-trie-count-delete} are the new update routiens for count queries.\\[1em]
+Once again, W.l.o.g. we assume that all our updates are for $R_1$, and furthermore, $R_1$'s columns appear at positions $p_1$ and $p_2$ respectively, in the global ordering. Our outer loop remains unchanged (Algorithm~\ref{alg:up-loop}), but we rephrase our update routines in terms of an implementation of the Trie-Join algorithm \cite{DBLP:journals/corr/abs-1210-0481}. We omit the algorithm here as it is available at the cited paper, but assume it is available as \texttt{trie-join(its\,:\,[iterator])\,:\,iterator}. Algorithms~\ref{alg:up-trie-join-insert} and~\ref{alg:up-trie-join-delete} give the new update routines for equijoin queries, and Algorithms~\ref{alg:up-trie-count-insert} and~\ref{alg:up-trie-count-delete} are the new update routiens for count queries.\\[1em]
 
 \begin{algorithm}
   \SetKwProg{Fn}{func}{}{}
